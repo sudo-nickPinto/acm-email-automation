@@ -11,8 +11,15 @@
 #   2. Extracts it to ~/news-digest
 #   3. Launches the setup wizard (start.sh)
 #
+# IMPORTANT: The entire script is wrapped in main() so that bash reads it
+# fully into memory before executing. Without this, 'curl | bash' reads
+# line-by-line from stdin, and 'exec < /dev/tty' would steal stdin away
+# from bash mid-script, breaking everything.
+#
 # No git, no GitHub account, no coding knowledge required.
 # =============================================================================
+
+main() {
 
 set -e
 
@@ -148,11 +155,11 @@ echo ""
 echo -e "  ${BOLD}Launching setup wizard...${NC}"
 echo ""
 
-# Reconnect stdin to the real terminal. When this script runs via
-# 'curl | bash', stdin is the curl pipe (already at EOF). We must
-# point it back to the actual terminal before launching start.sh,
-# otherwise every read/input() call downstream gets EOF instantly.
-exec < /dev/tty
-
 cd "$INSTALL_DIR"
-exec bash ./start.sh
+exec bash ./start.sh < /dev/tty
+
+}
+
+# Call main — bash has now read the entire function definition before
+# executing any of it, so 'exec < /dev/tty' inside can't break the read.
+main "$@"
