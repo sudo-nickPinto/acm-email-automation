@@ -1,9 +1,11 @@
 #!/bin/bash
 # =============================================================================
-# start.sh — Bootstrap Script for News Digest
+# start.sh — Bootstrap Script for News Digest (v3)
 # =============================================================================
 # This is the ONLY file your friend needs to run.
 # It checks for Python, helps install it if missing, then sets everything up.
+#
+# Supports: macOS, Linux, and Windows (Git Bash / WSL)
 #
 # Usage:
 #   chmod +x start.sh
@@ -93,6 +95,7 @@ detect_os() {
     case "$(uname -s)" in
         Darwin*) echo "macos" ;;
         Linux*)  echo "linux" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
         *)       echo "unknown" ;;
     esac
 }
@@ -156,6 +159,7 @@ echo -e "  ${DIM}This setup wizard will:${NC}"
 echo -e "  ${DIM}  1. Make sure Python is installed on your computer${NC}"
 echo -e "  ${DIM}  2. Install the required packages${NC}"
 echo -e "  ${DIM}  3. Walk you through configuration${NC}"
+echo -e "  ${DIM}  4. Optionally set up automatic daily delivery${NC}"
 echo ""
 echo -e "  ${DIM}Estimated time: 5–10 minutes${NC}"
 
@@ -333,6 +337,45 @@ else
                 exit 1
             fi
         fi
+
+    elif [[ "$OS" == "windows" ]]; then
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Windows (Git Bash / MSYS2 / WSL) installation flow
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        echo -e "  ${BOLD}How to install Python on Windows:${NC}"
+        echo ""
+        echo -e "  ${CYAN}Option A — Download from python.org (recommended)${NC}"
+        echo -e "  ${DIM}────────────────────────────────────────────────────${NC}"
+        echo -e "    1. Open this URL in your browser:"
+        echo ""
+        echo -e "       ${BOLD}https://www.python.org/downloads/${NC}"
+        echo ""
+        echo -e "    2. Click the big yellow \"Download Python 3.x.x\" button"
+        echo -e "    3. Run the downloaded .exe file"
+        echo -e "    4. ${RED}IMPORTANT:${NC} Check \"${BOLD}Add Python to PATH${NC}\" at the bottom!"
+        echo -e "    5. Click \"Install Now\""
+        echo -e "    6. When it finishes, ${BOLD}close and reopen${NC} your terminal"
+        echo -e "    7. Come back to this directory and run: ${DIM}./start.sh${NC}"
+        echo ""
+        echo -e "  ${CYAN}Option B — Install via winget (if you have it)${NC}"
+        echo -e "  ${DIM}────────────────────────────────────────────────────${NC}"
+        echo -e "    Run: ${DIM}winget install Python.Python.3.12${NC}"
+        echo -e "    Then close and reopen your terminal."
+        echo ""
+        echo -ne "  ${BOLD}After installing Python, press Enter to continue...${NC}"
+        read -r
+        echo ""
+
+        if PYTHON_CMD="$(find_python)"; then
+            PYTHON_VERSION="$("$PYTHON_CMD" --version 2>&1)"
+            success "Found ${PYTHON_VERSION}"
+        else
+            fail "Python still not found."
+            echo ""
+            info "If you just installed Python, close this terminal completely"
+            info "and open a new one, then run: ./start.sh"
+            exit 1
+        fi
     else
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Unknown OS
@@ -361,9 +404,18 @@ else
     success "Environment already exists."
 fi
 
+# Determine the correct venv binary path (Windows vs Unix)
+if [[ "$OS" == "windows" ]]; then
+    VENV_PIP="$VENV_DIR/Scripts/pip"
+    VENV_PYTHON_BIN="$VENV_DIR/Scripts/python"
+else
+    VENV_PIP="$VENV_DIR/bin/pip"
+    VENV_PYTHON_BIN="$VENV_DIR/bin/python3"
+fi
+
 info "Installing required packages (this takes a moment)..."
-"$VENV_DIR/bin/pip" install -q --upgrade pip 2>/dev/null
-"$VENV_DIR/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
+"$VENV_PIP" install -q --upgrade pip 2>/dev/null
+"$VENV_PIP" install -q -r "$SCRIPT_DIR/requirements.txt"
 success "All packages installed."
 
 # ---------------------------------------------------------------------------
@@ -380,4 +432,4 @@ mkdir -p "$SCRIPT_DIR/logs"
 #   - Writing the .env file
 #   - Sending a test email
 # ---------------------------------------------------------------------------
-"$VENV_DIR/bin/python3" "$SCRIPT_DIR/setup_wizard.py"
+"$VENV_PYTHON_BIN" "$SCRIPT_DIR/setup_wizard.py"

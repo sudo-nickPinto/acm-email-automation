@@ -1,22 +1,24 @@
-# Project: News Digest Email Automation (v2)
+# Project: News Digest Email Automation (v3)
 
 ## What this project is
-A terminal-first tool that sends users a daily email digest of news articles from newspapers they choose. Users clone the repo, run `./start.sh`, and a guided terminal wizard handles everything — Python installation, newspaper selection, email configuration.
+A terminal-first tool that sends users a daily email digest of news articles from newspapers they choose. Users clone the repo, run `./start.sh`, and a guided terminal wizard handles everything — Python installation, newspaper selection, email configuration, and automatic daily scheduling.
 
-## Current state
-- **Branch:** `public_attempt` (all v2 work happens here; `main` stays as v1)
+## Version history
 - **v1 (main branch):** ACM TechNews only, single RSS source, manual `.env` setup
-- **v2 (this branch):** Multi-source newspaper digest, interactive terminal setup, no manual file editing
+- **v2:** Multi-source newspaper digest, interactive terminal setup, no manual file editing
+- **v3 (current, public_attempt branch):** Adds automatic daily scheduling (macOS LaunchAgent, Linux cron, Windows Task Scheduler). The wizard asks users if they want auto-delivery and at what time.
+- **v4 (planned, not started):** Accessible export — OS-specific installers/scripts downloadable from the GitHub page so users don't need git or a GitHub account to install.
 
 ## Architecture
 ```
 start.sh              → Bootstrap: installs Python, creates venv, hands off to Python wizard
-setup_wizard.py       → Interactive CLI: newspaper selection, email config, writes .env
-newsdigest/           → Core package (renamed from acm_technews/)
-  config.py           → Loads .env, exposes constants
+setup_wizard.py       → Interactive CLI: source selection, email config, scheduling, writes .env
+newsdigest/           → Core package
+  config.py           → Loads .env, exposes constants (including SCHEDULE_TIME)
   sources.py          → Registry of newspaper RSS feeds with metadata
   scraper.py          → Fetches/parses RSS feeds (multi-source)
   emailer.py          → Formats and sends multi-source digest email
+  scheduler.py        → Installs/uninstalls daily schedule (LaunchAgent, cron, Task Scheduler)
 main.py               → Orchestrator: fetch → deduplicate → send
 ```
 
@@ -24,9 +26,10 @@ main.py               → Orchestrator: fetch → deduplicate → send
 - **Target audience:** Non-technical users (friends). Zero coding knowledge assumed.
 - **Minimal prerequisites:** Only a terminal and a Gmail account. Python install is guided.
 - **Terminal-first:** All setup happens interactively in the terminal. No manual file editing.
-- **macOS + Linux:** Must work on both. `start.sh` detects OS and adjusts.
+- **macOS + Linux + Windows:** Must work on all three. `start.sh` detects OS and adjusts. Windows users use PowerShell or Git Bash.
 - **Gmail SMTP only:** Uses App Passwords with 2FA. The wizard explains how to get one.
 - **Free RSS feeds only:** We can only scrape newspapers that provide public RSS feeds.
+- **Scheduling:** macOS uses LaunchAgent plist. Linux uses crontab. Windows uses Task Scheduler (schtasks.exe). The wizard handles installation/removal.
 
 ## Code style
 - Heavily commented — every function, every block explains *what* and *why*

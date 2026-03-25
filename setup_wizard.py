@@ -1,5 +1,5 @@
 # =============================================================================
-# setup_wizard.py — Interactive Terminal Setup Wizard (v2)
+# setup_wizard.py — Interactive Terminal Setup Wizard (v3)
 # =============================================================================
 #
 # This is the guided setup experience that runs after start.sh installs Python
@@ -9,6 +9,7 @@
 #   2. Setting up their Gmail credentials (with clear instructions)
 #   3. Writing the .env file automatically
 #   4. Sending a test email to verify everything works
+#   5. Setting up automatic daily scheduling (optional)
 #
 # Design philosophy:
 # ------------------
@@ -21,7 +22,8 @@
 #   venv/bin/python3 setup_wizard.py
 #
 # Dependencies:
-#   newsdigest.sources — the source registry
+#   newsdigest.sources    — the source registry
+#   newsdigest.scheduler  — daily schedule installer
 #   (everything else is stdlib)
 # =============================================================================
 
@@ -36,6 +38,7 @@ from pathlib import Path
 
 # We import sources directly — this module has no dependencies beyond stdlib
 from newsdigest.sources import AVAILABLE_SOURCES, NewsSource
+from newsdigest.scheduler import install_schedule, uninstall_schedule, is_schedule_installed, detect_os
 
 
 # ---------------------------------------------------------------------------
@@ -258,7 +261,12 @@ def _prompt_app_password() -> str:
         return password
 
 
-def _write_env(email: str, app_password: str, sources: list[NewsSource]) -> None:
+def _write_env(
+    email: str,
+    app_password: str,
+    sources: list[NewsSource],
+    schedule_time: str = "",
+) -> None:
     """
     Write the .env file with the user's configuration.
 
@@ -267,6 +275,7 @@ def _write_env(email: str, app_password: str, sources: list[NewsSource]) -> None
         SMTP_APP_PASSWORD=abcdefghijklmnop
         RECIPIENT_EMAIL=user@gmail.com
         SELECTED_SOURCES=acm_technews,bbc_tech
+        SCHEDULE_TIME=08:00  (or empty if no schedule)
     """
     source_keys = ",".join(s.key for s in sources)
 
@@ -276,17 +285,102 @@ SMTP_EMAIL={email}
 SMTP_APP_PASSWORD={app_password}
 RECIPIENT_EMAIL={email}
 SELECTED_SOURCES={source_keys}
+SCHEDULE_TIME={schedule_time}
 """
 
     ENV_FILE.write_text(env_content)
     success(f"Configuration saved to .env")
 
 
+def _prompt_schedule() -> str:
+    """
+    Ask the user if they want automatic daily delivery.
+
+    Returns:
+        Time string like "08:00" if they want scheduling,
+        or empty string "" if they decline.
+    """
+    step(4, "Automatic daily delivery")
+    print()
+    print(f"  Would you like to receive your digest {BOLD}automatically{NC}")
+    print(f"  every day without having to run a command?")
+    print()
+
+    current_os = detect_os()
+    if current_os == "macos":
+        mechanism = "macOS LaunchAgent"
+    elif current_os == "linux":
+        mechanism = "cron job"
+    elif current_os == "windows":
+        mechanism = "Windows Task Scheduler"
+    else:
+        print(f"  {DIM}Automatic scheduling is not supported on your OS.{NC}")
+        print(f"  {DIM}You can run the digest manually with: venv/bin/python3 main.py{NC}")
+        return ""
+
+    print(f"  {DIM}This will set up a {mechanism} on your computer.{NC}")
+    print(f"  {DIM}Your computer needs to be on at the scheduled time.{NC}")
+    print()
+
+    while True:
+        answer = input(f"  {BOLD}Enable daily delivery? [y/n]:{NC} ").strip().lower()
+        if answer in ("n", "no"):
+            print()
+            info("No problem! You can always send manually with:")
+            print(f"    {DIM}venv/bin/python3 main.py{NC}")
+            return ""
+        elif answer in ("y", "yes"):
+            break
+        else:
+            print(f"  {DIM}Please type y or n.{NC}")
+
+    # Ask what time
+    print()
+    print(f"  What time would you like your digest delivered?")
+    print(f"  {DIM}Use 24-hour format (e.g., 08:00 for 8 AM, 18:30 for 6:30 PM){NC}")
+    print()
+
+    while True:
+        time_input = input(f"  {BOLD}Delivery time [default: 08:00]:{NC} ").strip()
+
+        if not time_input:
+            time_input = "08:00"
+
+        # Validate format
+        import re as _re
+        match = _re.match(r"^(\d{1,2}):(\d{2})$", time_input)
+        if not match:
+            warn("Please use HH:MM format (e.g., 08:00, 14:30).")
+            continue
+
+        hour = int(match.group(1))
+        minute = int(match.group(2))
+
+        if hour < 0 or hour > 23:
+            warn("Hour must be between 0 and 23.")
+            continue
+        if minute < 0 or minute > 59:
+            warn("Minute must be between 0 and 59.")
+            continue
+
+        # Install the schedule
+        print()
+        try:
+            message = install_schedule(hour, minute)
+            success(message)
+        except (RuntimeError, ValueError) as e:
+            fail(str(e))
+            info("You can still run the digest manually.")
+            return ""
+
+        return f"{hour:02d}:{minute:02d}"
+
+
 def _offer_test(email: str) -> None:
     """
     Offer to send a test email so the user can verify setup works.
     """
-    step(4, "Test your setup")
+    step(5, "Test your setup")
     print()
     print(f"  Want to send a test email to {BOLD}{email}{NC} right now?")
     print(f"  {DIM}This will fetch real articles and send a digest.{NC}")
@@ -378,11 +472,18 @@ def run_wizard() -> None:
     # Step 3: App Password
     app_password = _prompt_app_password()
 
-    # Write the .env file
+    # Write the .env file (without schedule for now — test first)
     print()
     _write_env(email, app_password, sources)
 
-    # Step 4: Offer test
+    # Step 4: Schedule
+    schedule_time = _prompt_schedule()
+
+    # If they chose a schedule, update .env with the time
+    if schedule_time:
+        _write_env(email, app_password, sources, schedule_time)
+
+    # Step 5: Offer test
     _offer_test(email)
 
     # Final success message
@@ -392,6 +493,9 @@ def run_wizard() -> None:
     print()
     print(f"  {BOLD}Quick reference:{NC}")
     print()
+    if schedule_time:
+        print(f"    {GREEN}Auto-delivery is ON — daily at {schedule_time}{NC}")
+        print()
     print(f"    Send your digest now:")
     print(f"    {DIM}$ venv/bin/python3 main.py{NC}")
     print()

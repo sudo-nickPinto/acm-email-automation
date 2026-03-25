@@ -1,16 +1,15 @@
 # =============================================================================
-# config.py — Central Configuration Module (v2)
+# config.py — Central Configuration Module (v3)
 # =============================================================================
 #
 # Single source of truth for every configurable value in the project.
 # Loads settings from .env (written by the setup wizard) and exposes
 # them as plain module-level constants.
 #
-# What changed from v1:
+# What changed from v2:
 # ---------------------
-# - Added SELECTED_SOURCES — comma-separated list of source keys the user chose
-# - RECIPIENT_EMAIL is now the same as SMTP_EMAIL (users email themselves)
-#   but kept separate in case they want to forward to someone else
+# - Added SCHEDULE_TIME — the daily delivery time (e.g., "08:00") if
+#   the user opted into automatic scheduling, or "" if not
 #
 # Dependencies:
 #   python-dotenv — reads key=value pairs from .env into os.environ
@@ -65,3 +64,11 @@ SELECTED_SOURCES_RAW: str = os.getenv("SELECTED_SOURCES", "")
 SELECTED_SOURCES: list[str] = [
     s.strip() for s in SELECTED_SOURCES_RAW.split(",") if s.strip()
 ]
+
+# ---------------------------------------------------------------------------
+# Schedule settings
+# ---------------------------------------------------------------------------
+
+# The time the daily digest is scheduled to send (e.g., "08:00").
+# Empty string means no automatic scheduling — user runs main.py manually.
+SCHEDULE_TIME: str = os.getenv("SCHEDULE_TIME", "")
