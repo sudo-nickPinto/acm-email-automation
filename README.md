@@ -4,11 +4,11 @@
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform: macOS | Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)]()
+[![Platform: macOS | Linux | Windows](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey.svg)]()
 
 ## What is this?
 
-A terminal tool that sends you a daily email digest of news articles from newspapers you choose. You pick your sources, enter your Gmail, and you're done — your news shows up in your inbox.
+A terminal tool that sends you a daily email digest of news articles from newspapers you choose. You pick your sources, enter your Gmail, and you're done — your news shows up in your inbox, automatically.
 
 **Available sources:**
 - ACM TechNews — curated computing & tech articles (Mon/Wed/Fri)
@@ -18,41 +18,29 @@ A terminal tool that sends you a daily email digest of news articles from newspa
 
 **No coding knowledge required.** The setup wizard walks you through everything.
 
-## Quick Start
+## Install (One Command)
 
-### Prerequisites
-- A computer with a terminal (macOS or Linux)
-- A Gmail account
+Open your terminal and paste the command for your OS:
 
-That's it. The setup wizard handles Python installation if needed.
-
-### 1. Clone the repository
+### macOS / Linux
 
 ```bash
-git clone https://github.com/sudo-nickPinto/acm-email-automation.git
-cd acm-email-automation
+curl -fsSL https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.sh | bash
 ```
 
-### 2. Run the setup wizard
+### Windows (PowerShell)
 
-```bash
-chmod +x start.sh
-./start.sh
+```powershell
+irm https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.ps1 | iex
 ```
 
-The wizard will:
-1. Install Python if you don't have it
-2. Ask which newspapers you want
-3. Walk you through Gmail App Password setup (with step-by-step instructions)
-4. Offer to send a test email
+That's it. The installer downloads everything, installs Python if needed, and launches the setup wizard.
 
-### 3. Send your digest anytime
-
-```bash
-venv/bin/python3 main.py          # Send the digest
-venv/bin/python3 main.py --dry-run  # Preview without sending
-venv/bin/python3 main.py --force    # Resend even if already sent today
-```
+> **Already have git?** You can also clone directly:
+> ```bash
+> git clone https://github.com/sudo-nickPinto/acm-email-automation.git
+> cd acm-email-automation && chmod +x start.sh && ./start.sh
+> ```
 
 ## How It Works
 
@@ -64,17 +52,27 @@ venv/bin/python3 main.py --force    # Resend even if already sent today
                      └──────────────┘     └──────────────┘
 ```
 
-1. **`start.sh`** bootstraps Python, creates the virtual environment, and launches the setup wizard
-2. **`setup_wizard.py`** walks you through newspaper selection and email config
-3. **`main.py`** orchestrates: fetch → deduplicate → send
-4. **`newsdigest/scraper.py`** fetches RSS feeds and parses articles
-5. **`newsdigest/emailer.py`** formats a multi-section HTML + plain-text email and sends via Gmail SMTP
+The setup wizard:
+1. Asks which newspapers you want
+2. Walks you through Gmail App Password setup
+3. Optionally sets up **automatic daily delivery** (LaunchAgent on macOS, cron on Linux, Task Scheduler on Windows)
+4. Offers to send a test email
+
+After setup, your digest arrives automatically — or you can send it manually anytime:
+
+```bash
+venv/bin/python3 main.py            # Send the digest
+venv/bin/python3 main.py --dry-run  # Preview without sending
+venv/bin/python3 main.py --force    # Resend even if already sent today
+```
 
 ## Project Structure
 
 ```
 acm_email_automation/
-├── start.sh                 # Run this — bootstraps everything
+├── install.sh               # One-line installer (macOS / Linux)
+├── install.ps1              # One-line installer (Windows)
+├── start.sh                 # Bootstrap + setup wizard launcher
 ├── setup_wizard.py          # Interactive terminal setup
 ├── main.py                  # Entry point / orchestrator
 ├── newsdigest/              # Core Python package
@@ -82,7 +80,8 @@ acm_email_automation/
 │   ├── config.py            # Loads settings from .env
 │   ├── sources.py           # Registry of newspaper RSS feeds
 │   ├── scraper.py           # Fetches + parses RSS feeds
-│   └── emailer.py           # Formats + sends the email
+│   ├── emailer.py           # Formats + sends the email
+│   └── scheduler.py         # Installs daily schedule per OS
 ├── requirements.txt         # Python dependencies
 ├── .env.example             # Template for configuration
 ├── docs/                    # Full documentation

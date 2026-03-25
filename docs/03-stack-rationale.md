@@ -142,11 +142,11 @@ You could set `export SMTP_PASSWORD=...` in your shell profile, but:
 
 ### Why a shell script?
 
-Python can't install itself. We need something that runs _before_ Python exists on the system. Bash is universally available on macOS and Linux.
+Python can't install itself. We need something that runs _before_ Python exists on the system. Bash is available on macOS and Linux natively, and on Windows through Git Bash or WSL. For native Windows users who have only PowerShell, `install.ps1` handles the bootstrap directly in PowerShell.
 
 ### Why not just tell users to install Python?
 
-Our target audience is non-technical friends. "Install Python 3.10+" is a surprisingly complex instruction for someone who has never used a package manager. `start.sh` detects whether Python is installed, and if not, provides OS-specific step-by-step instructions (with Homebrew auto-detection on macOS, and apt/dnf/pacman detection on Linux).
+Our target audience is non-technical friends. "Install Python 3.10+" is a surprisingly complex instruction for someone who has never used a package manager. `start.sh` detects whether Python is installed, and if not, provides OS-specific step-by-step instructions (with Homebrew auto-detection on macOS, apt/dnf/pacman detection on Linux, and python.org/winget guidance on Windows).
 
 ---
 

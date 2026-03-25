@@ -1,16 +1,18 @@
-# Project: News Digest Email Automation (v3)
+# Project: News Digest Email Automation (v4)
 
 ## What this project is
-A terminal-first tool that sends users a daily email digest of news articles from newspapers they choose. Users clone the repo, run `./start.sh`, and a guided terminal wizard handles everything — Python installation, newspaper selection, email configuration, and automatic daily scheduling.
+A terminal-first tool that sends users a daily email digest of news articles from newspapers they choose. Friends paste one command into their terminal and the installer handles everything — downloading the project, Python installation, newspaper selection, email configuration, and automatic daily scheduling.
 
 ## Version history
 - **v1 (main branch):** ACM TechNews only, single RSS source, manual `.env` setup
 - **v2:** Multi-source newspaper digest, interactive terminal setup, no manual file editing
-- **v3 (current, public_attempt branch):** Adds automatic daily scheduling (macOS LaunchAgent, Linux cron, Windows Task Scheduler). The wizard asks users if they want auto-delivery and at what time.
-- **v4 (planned, not started):** Accessible export — OS-specific installers/scripts downloadable from the GitHub page so users don't need git or a GitHub account to install.
+- **v3:** Adds automatic daily scheduling (macOS LaunchAgent, Linux cron, Windows Task Scheduler). The wizard asks users if they want auto-delivery and at what time.
+- **v4 (current, public_attempt branch):** One-line installers (`install.sh` for macOS/Linux, `install.ps1` for Windows) so friends don't need git or a GitHub account. Paste one command → everything works.
 
 ## Architecture
 ```
+install.sh            → One-line installer: macOS/Linux (curl | bash)
+install.ps1           → One-line installer: Windows (irm | iex)
 start.sh              → Bootstrap: installs Python, creates venv, hands off to Python wizard
 setup_wizard.py       → Interactive CLI: source selection, email config, scheduling, writes .env
 newsdigest/           → Core package
@@ -44,7 +46,9 @@ main.py               → Orchestrator: fetch → deduplicate → send
 - README.md at root is the public-facing quickstart
 
 ## Commands
-- `./start.sh` — Full bootstrap + setup wizard
+- `curl -fsSL <raw-install-url> | bash` — One-line install (macOS/Linux)
+- `irm <raw-install-url> | iex` — One-line install (Windows PowerShell)
+- `./start.sh` — Full bootstrap + setup wizard (if cloned manually)
 - `venv/bin/python3 main.py --dry-run` — Preview without sending
 - `venv/bin/python3 main.py` — Send the digest
 - `venv/bin/python3 main.py --force` — Bypass duplicate detection

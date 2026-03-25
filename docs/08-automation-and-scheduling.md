@@ -1,11 +1,37 @@
-# 08 — Bootstrap and Setup
+# 08 — Bootstrap, Setup, and Scheduling
 
-## The Two Bootstrap Files
+## The Full Bootstrap Chain
 
-Getting from "my friend cloned the repo" to "they're receiving news digests" requires two scripts working together:
+Getting from "my friend opened a terminal" to "they're receiving daily news digests" requires a chain of scripts:
 
-1. **`start.sh`** — a bash script that gets Python installed, creates a virtual environment, installs dependencies, and launches the wizard
-2. **`setup_wizard.py`** — a Python script that handles newspaper selection, Gmail setup, and writes the `.env` file
+1. **`install.sh`** / **`install.ps1`** — one-line installers that download the project (no git required)
+2. **`start.sh`** — a bash script that gets Python installed, creates a virtual environment, installs dependencies, and launches the wizard
+3. **`setup_wizard.py`** — a Python script that handles newspaper selection, Gmail setup, scheduling, and writes the `.env` file
+4. **`newsdigest/scheduler.py`** — installs a daily schedule using OS-native tools
+
+## `install.sh` / `install.ps1` — The One-Line Installers
+
+These scripts exist so friends don't need git or a GitHub account. They paste one command into their terminal:
+
+**macOS / Linux:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.sh | bash
+```
+
+**Windows (PowerShell):**
+```powershell
+irm https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.ps1 | iex
+```
+
+### What they do
+
+1. Download the project as a `.zip` from GitHub's archive URL (no git clone)
+2. Extract to `~/news-digest` (or `$HOME\news-digest` on Windows)
+3. If an existing installation is found, offer to reinstall
+4. Launch `start.sh` (or run the equivalent bootstrap steps directly on Windows)
+
+`install.sh` uses `curl` + `unzip` with a Python `zipfile` fallback if `unzip` isn't available.
+`install.ps1` uses `Invoke-WebRequest` + `Expand-Archive` (built into PowerShell 5+).
 
 ## `start.sh` — The Bootstrap Script
 
@@ -51,9 +77,25 @@ If no Python is found, the script detects the OS and provides installation instr
 
 - **macOS:** Offers two paths — download from python.org (recommended for beginners), or install via Homebrew (`brew install python3`) if Homebrew is already present
 - **Linux:** Detects the package manager (apt, dnf, or pacman) and shows the correct install command
+- **Windows (Git Bash / MSYS2 / Cygwin):** Directs users to python.org or `winget install Python.Python.3.12`, emphasizing "Add Python to PATH" during install
 - **Unknown OS:** Falls back to a link to python.org
 
 After showing instructions, the script pauses and waits for the user to confirm they've installed Python, then re-checks.
+
+### OS Detection
+
+```bash
+detect_os() {
+    case "$(uname -s)" in
+        Darwin*)  echo "macos" ;;
+        Linux*)   echo "linux" ;;
+        MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+        *)        echo "unknown" ;;
+    esac
+}
+```
+
+On Windows, `start.sh` adjusts venv paths (`Scripts/` instead of `bin/`) and pip commands accordingly.
 
 ### Step 2: Virtual Environment + Dependencies
 
@@ -97,10 +139,13 @@ run_wizard()
   ├── Step 3: _prompt_app_password()
   │   └── Explain App Passwords → show how-to steps → collect password
   │
-  ├── _write_env()
-  │   └── Write .env file automatically
+  ├── Step 4: _prompt_schedule()
+  │   └── Ask if user wants daily auto-delivery → pick time → install schedule
   │
-  ├── Step 4: _offer_test()
+  ├── _write_env()
+  │   └── Write .env file automatically (including SCHEDULE_TIME)
+  │
+  ├── Step 5: _offer_test()
   │   └── Offer to send a test email → run main.py as subprocess
   │
   └── Show "Setup Complete" with quick reference commands
@@ -172,6 +217,45 @@ Runs `main.py` as a subprocess to send a real digest. If it fails, the wizard sh
 ### Existing Configuration
 
 If `.env` already exists, the wizard asks whether to reconfigure or keep the existing setup. This makes re-running `./start.sh` safe — it won't overwrite settings unless the user explicitly wants to change them.
+
+## `newsdigest/scheduler.py` — Automatic Daily Scheduling
+
+The scheduler makes news delivery automatic. Users choose a time during setup, and the digest arrives daily without any manual action.
+
+### OS-Native Approach
+
+Rather than using a Python-based scheduler (which would require a process running 24/7), we use the OS's own scheduling system:
+
+| OS | Mechanism | Location |
+|----|-----------|----------|
+| **macOS** | LaunchAgent plist | `~/Library/LaunchAgents/com.newsdigest.daily.plist` |
+| **Linux** | crontab | User's crontab (tagged with `# com.newsdigest.daily`) |
+| **Windows** | Task Scheduler | `schtasks /TN "NewsDigest"` |
+
+### Public API
+
+```python
+install_schedule(hour: int, minute: int) -> None  # Install/update daily schedule
+uninstall_schedule() -> None                       # Remove the daily schedule
+is_schedule_installed() -> bool                    # Check if a schedule exists
+```
+
+### How Each Backend Works
+
+**macOS (LaunchAgent):** Writes a plist XML file that tells `launchd` to run `main.py` daily at the specified time. `launchctl load` activates it immediately. The plist points to the venv's Python interpreter so dependencies are always available.
+
+**Linux (cron):** Adds a crontab entry like `30 8 * * * /path/to/venv/bin/python3 /path/to/main.py`. Uses a unique tag comment so the entry can be found and replaced on subsequent runs.
+
+**Windows (Task Scheduler):** Uses `schtasks.exe /Create /SC DAILY /ST 08:30 /TN "NewsDigest"` to create a scheduled task. The task runs even if the user isn't logged in (with `/RL HIGHEST` if available).
+
+### The Wizard Integration
+
+Step 4 of the setup wizard (`_prompt_schedule`) asks:
+1. "Would you like automatic daily delivery?" (y/n)
+2. If yes: "What time? (24-hour format, e.g. 08:30)"
+3. Validation: checks HH:MM format, 0-23 hours, 0-59 minutes
+4. Calls `install_schedule(hour, minute)`
+5. The chosen time is saved to `.env` as `SCHEDULE_TIME=08:30`
 
 ## Adding a New Source
 
