@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+venv/
+.venv/
+.last_sent
+logs/
+*.plist
+docs/
