@@ -1,114 +1,76 @@
 # =============================================================================
-# main.py — Orchestrator / Entry Point for ACM TechNews Email Automation
+# main.py — Orchestrator / Entry Point for News Digest (v2)
 # =============================================================================
 #
-# This is the file you run.  It ties together the scraper and the emailer
-# into a simple pipeline:
+# This is the file you run to fetch and send your digest.
+# It ties together the scraper and emailer into a simple pipeline:
 #
-#     fetch articles  →  check for duplicates  →  send email
+#     fetch from all sources  →  check for duplicates  →  send email
 #
-# Why a separate main.py?
-# -----------------------
-# In software engineering, the "entry point" should be thin — it coordinates
-# other modules but contains minimal logic itself.  If scraping logic lived
-# here, and emailing logic lived here, this file would be a tangled mess.
-# Instead, main.py is a ~60-line conductor: it calls fetch_articles(), makes
-# a decision (new edition or duplicate?), then calls send_email().
-#
-# Duplicate detection:
-# --------------------
-# ACM TechNews publishes roughly 3 times a week (Mon/Wed/Fri).  If our
-# scheduled job fires but the feed hasn't updated yet, we don't want to
-# spam the recipient with the same articles.  We solve this by hashing the
-# article titles with SHA-256 and storing the hash in a .last_sent file.
-# On the next run, if the hash matches, we skip sending.
+# What changed from v1:
+# ---------------------
+# v1 only fetched ACM TechNews.  v2 fetches from every source the user
+# selected in the setup wizard, and sends a multi-section digest.
 #
 # CLI flags:
 #   --force    Send the email even if we already sent this edition
-#   --dry-run  Print the plain-text email to the terminal without sending
+#   --dry-run  Print the plain-text digest to the terminal without sending
 #
 # Dependencies:
-#   hashlib, json, os, sys, pathlib — all stdlib
-#   acm_technews.scraper — our RSS feed module
-#   acm_technews.emailer — our email formatting/sending module
+#   hashlib, sys, pathlib — all stdlib
+#   newsdigest.scraper — multi-source RSS fetching
+#   newsdigest.emailer — multi-source email formatting/sending
+#   newsdigest.config  — loaded indirectly through scraper/emailer
 # =============================================================================
 
 #!/usr/bin/env python3
 """
-ACM TechNews Email Automation — main entry point.
+News Digest Email Automation — main entry point.
 
-Fetches the latest ACM TechNews articles and emails a formatted digest.
+Fetches articles from selected newspaper sources and emails a formatted digest.
 """
 
-# hashlib provides SHA-256 hashing, which we use to fingerprint article lists
 import hashlib
-
-# json is imported but currently unused — it was included for potential future
-# state serialization (e.g., storing more than just a hash in .last_sent)
-import json
-
-# os provides operating system utilities (not heavily used here since we
-# prefer pathlib, but available for path joins and env access if needed)
-import os
-
-# sys gives us access to command-line arguments (sys.argv) and the ability
-# to exit with a status code (sys.exit)
 import sys
-
-# Path is an object-oriented filepath handler that makes file operations
-# cleaner than raw string manipulation with os.path
 from pathlib import Path
 
-# Import the scraper function — this does the HTTP request and XML parsing
-from acm_technews.scraper import fetch_articles
-
-# Import the email sender — this formats articles into HTML/text and sends
-from acm_technews.emailer import send_email
+from newsdigest.scraper import fetch_all_sources, SourceResult
+from newsdigest.emailer import send_email, build_plain_text
+from newsdigest.config import SELECTED_SOURCES
 
 # Path to the state file that stores the hash of the last-sent edition.
-# We put it in the same directory as main.py (using __file__ to find that
-# directory regardless of where the script is invoked from).
 STATE_FILE = Path(__file__).parent / ".last_sent"
 
 
-def _articles_hash(articles) -> str:
+def _results_hash(results: list[SourceResult]) -> str:
     """
-    Create a SHA-256 hash of all article titles, joined by pipes.
+    Create a SHA-256 hash of all article titles across all sources.
 
-    This serves as a fingerprint for a particular edition of TechNews.
-    If the titles haven't changed, the hash will be identical, and we
-    know we've already sent this edition.
-
-    Example:
-        articles with titles ["AI in Healthcare", "Quantum Advances"]
-        → SHA-256 of "AI in Healthcare|Quantum Advances"
-        → "a3f2c8..."
+    This fingerprints the current set of articles so we can detect
+    when the feeds haven't updated since the last send.
     """
-    # Join all titles with | as a delimiter, then hash the result
-    titles = "|".join(a.title for a in articles)
-    return hashlib.sha256(titles.encode()).hexdigest()
+    all_titles = []
+    for result in results:
+        for article in result.articles:
+            all_titles.append(article.title)
+
+    combined = "|".join(all_titles)
+    return hashlib.sha256(combined.encode()).hexdigest()
 
 
 def _already_sent(current_hash: str) -> bool:
     """
-    Check if we already sent an email for this exact edition.
-
-    Reads the stored hash from .last_sent and compares it to the
-    current hash.  Returns True if they match (meaning: don't send).
+    Check if we already sent an email with this exact set of articles.
     """
-    # If the state file doesn't exist, we've never sent anything
     if not STATE_FILE.exists():
         return False
-
-    # Read the stored hash and compare (strip whitespace just in case)
     stored = STATE_FILE.read_text().strip()
     return stored == current_hash
 
 
 def _save_state(current_hash: str) -> None:
     """
-    Persist the current edition's hash to disk so future runs can
-    detect duplicates.  Overwrites any previous content.
+    Persist the current edition's hash to disk.
     """
     STATE_FILE.write_text(current_hash)
 
@@ -117,62 +79,67 @@ def main():
     """
     Main execution flow:
       1. Parse CLI flags (--force, --dry-run)
-      2. Fetch articles from the RSS feed
-      3. Check for duplicate edition (skip if already sent)
-      4. Either preview (dry run) or send the email
-      5. Save state so we don't re-send
+      2. Validate that sources are configured
+      3. Fetch articles from all selected sources
+      4. Check for duplicate edition
+      5. Either preview (dry run) or send the email
+      6. Save state
     """
-    # Check if --force was passed as a command-line argument.
-    # --force bypasses the duplicate check and sends regardless.
     force = "--force" in sys.argv
-
-    # Check if --dry-run was passed.
-    # --dry-run prints the email to the terminal without actually sending it.
     dry_run = "--dry-run" in sys.argv
 
-    # Step 1: Fetch articles from the ACM TechNews RSS feed
-    print("Fetching ACM TechNews...")
-    articles = fetch_articles()
-
-    # If no articles came back, the feed might be down or empty
-    if not articles:
-        print("No articles found. The RSS feed may be empty or unavailable.")
-        # Exit with code 1 to signal failure (useful for monitoring)
+    # Validate configuration
+    if not SELECTED_SOURCES:
+        print("No news sources configured.")
+        print("Run ./start.sh to set up your digest.")
         sys.exit(1)
 
-    print(f"Found {len(articles)} articles.")
+    # Step 1: Fetch from all sources
+    print("Fetching your news digest...")
+    print()
+    results = fetch_all_sources()
 
-    # Step 2: Hash the current articles to create a fingerprint
-    current_hash = _articles_hash(articles)
+    # Count total articles across all sources
+    total = sum(len(r.articles) for r in results)
+    errors = sum(1 for r in results if r.error)
 
-    # Step 3: Skip if we already sent this edition (unless --force)
+    print()
+    if total == 0:
+        print("No articles found from any source.")
+        if errors > 0:
+            print(f"{errors} source(s) had errors — check your internet connection.")
+        sys.exit(1)
+
+    print(f"Total: {total} articles from {len(results) - errors} source(s).")
+
+    # Step 2: Hash and check for duplicates
+    current_hash = _results_hash(results)
+
     if not force and _already_sent(current_hash):
-        print("Already sent email for this edition. Use --force to resend.")
-        sys.exit(0)  # Exit 0 = success, just nothing to do
+        print("Already sent this digest. No new articles since last send.")
+        print("Use --force to resend, or wait for sources to update.")
+        sys.exit(0)
 
-    # Step 4a: Dry run mode — preview only, no email sent
+    # Step 3a: Dry run — preview only
     if dry_run:
-        # Import build_plain_text here (lazy import) since it's only needed
-        # for dry runs, not for every execution
-        from acm_technews.emailer import build_plain_text
-        print("\n--- DRY RUN (plain text preview) ---\n")
-        print(build_plain_text(articles))
-        print("\n--- END DRY RUN ---")
-        return  # Don't save state — dry runs shouldn't count as "sent"
+        print()
+        print("--- DRY RUN (plain text preview) ---")
+        print()
+        print(build_plain_text(results))
+        print()
+        print("--- END DRY RUN ---")
+        return  # Don't save state for dry runs
 
-    # Step 4b: Actually send the email
-    send_email(articles)
+    # Step 3b: Send the email
+    print()
+    send_email(results)
 
-    # Step 5: Save the hash so we don't re-send this same edition
+    # Step 4: Save state
     _save_state(current_hash)
 
+    print()
     print("Done!")
 
 
-# ---------------------------------------------------------------------------
-# Standard Python idiom: only run main() when this file is executed directly.
-# If someone imports main.py as a module (rare, but possible), main() won't
-# run automatically — they'd have to call it explicitly.
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     main()

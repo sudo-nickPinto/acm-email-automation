@@ -372,19 +372,12 @@ success "All packages installed."
 mkdir -p "$SCRIPT_DIR/logs"
 
 # ---------------------------------------------------------------------------
-# Done — hand off to the Python setup wizard (future v2 feature)
+# Step 3: Launch the interactive setup wizard
 # ---------------------------------------------------------------------------
-step "3" "Ready!"
-
-echo -e "  ${GREEN}Everything is installed and ready to go.${NC}"
-echo ""
-echo -e "  ${BOLD}What you can do now:${NC}"
-echo ""
-echo -e "    Preview a test email (no email sent):"
-echo -e "    ${DIM}$ ${VENV_DIR}/bin/python3 ${SCRIPT_DIR}/main.py --dry-run${NC}"
-echo ""
-echo -e "    Send the email:"
-echo -e "    ${DIM}$ ${VENV_DIR}/bin/python3 ${SCRIPT_DIR}/main.py${NC}"
-echo ""
-echo -e "  ${DIM}To re-run this setup at any time: ./start.sh${NC}"
-echo ""
+# The wizard is a Python script that handles:
+#   - Newspaper source selection
+#   - Gmail credential setup
+#   - Writing the .env file
+#   - Sending a test email
+# ---------------------------------------------------------------------------
+"$VENV_DIR/bin/python3" "$SCRIPT_DIR/setup_wizard.py"

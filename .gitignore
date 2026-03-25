@@ -6,4 +6,4 @@ venv/
 .last_sent
 logs/
 *.plist
-docs/
+.github
