@@ -62,7 +62,7 @@ if [ -d "$INSTALL_DIR" ]; then
     echo -e "  ${DIM}cd $INSTALL_DIR && ./start.sh${NC}"
     echo ""
     echo -ne "  ${BOLD}Reinstall from scratch? [y/n]:${NC} "
-    read -r answer
+    read -r answer < /dev/tty
     case "$answer" in
         [Yy]|[Yy][Ee][Ss])
             echo ""
@@ -149,4 +149,4 @@ echo -e "  ${BOLD}Launching setup wizard...${NC}"
 echo ""
 
 cd "$INSTALL_DIR"
-./start.sh
+./start.sh < /dev/tty
