@@ -155,8 +155,14 @@ echo ""
 echo -e "  ${BOLD}Launching setup wizard...${NC}"
 echo ""
 
+# Reconnect stdin to the real terminal FIRST, as a separate step.
+# Then launch start.sh. Combining 'exec bash ./start.sh < /dev/tty'
+# in one command hangs because the stdin redirect and process
+# replacement race each other.
+exec < /dev/tty
+
 cd "$INSTALL_DIR"
-exec bash ./start.sh < /dev/tty
+exec bash ./start.sh
 
 }
 
