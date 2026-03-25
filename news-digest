@@ -1,0 +1,220 @@
+#!/bin/bash
+# =============================================================================
+# news-digest — CLI command for News Digest
+# =============================================================================
+#
+# After installation, this command is available from anywhere in the terminal.
+#
+# Usage:
+#   news-digest run          Send today's digest
+#   news-digest run --dry    Preview without sending
+#   news-digest run --force  Force re-send even if already sent
+#   news-digest setup        Re-run the setup wizard
+#   news-digest uninstall    Remove everything (schedule, files, command)
+#   news-digest status       Show install info and schedule status
+#   news-digest help         Show this help message
+#
+# =============================================================================
+
+set -e
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+INSTALL_DIR="$HOME/news-digest"
+VENV_PYTHON="$INSTALL_DIR/venv/bin/python3"
+
+# ---------------------------------------------------------------------------
+# Colors
+# ---------------------------------------------------------------------------
+BOLD='\033[1m'
+DIM='\033[2m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+# ---------------------------------------------------------------------------
+# Verify installation exists
+# ---------------------------------------------------------------------------
+check_install() {
+    if [ ! -d "$INSTALL_DIR" ]; then
+        echo -e "  ${RED}✘${NC}  News Digest is not installed."
+        echo -e "  ${DIM}Install it with:${NC}"
+        echo -e "  ${DIM}curl -fsSL https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.sh | bash${NC}"
+        exit 1
+    fi
+    if [ ! -f "$VENV_PYTHON" ]; then
+        echo -e "  ${RED}✘${NC}  Installation is incomplete (no Python environment)."
+        echo -e "  ${DIM}Re-run: cd $INSTALL_DIR && ./start.sh${NC}"
+        exit 1
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------------
+
+cmd_run() {
+    check_install
+    local flags=""
+    case "${1:-}" in
+        --dry|--dry-run)  flags="--dry-run" ;;
+        --force)          flags="--force" ;;
+        "")               flags="" ;;
+        *)
+            echo -e "  ${RED}✘${NC}  Unknown flag: $1"
+            echo -e "  ${DIM}Options: --dry, --force${NC}"
+            exit 1
+            ;;
+    esac
+    "$VENV_PYTHON" "$INSTALL_DIR/main.py" $flags
+}
+
+cmd_setup() {
+    check_install
+    cd "$INSTALL_DIR"
+    bash ./start.sh
+}
+
+cmd_uninstall() {
+    check_install
+
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}  News Digest — Uninstall${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  This will remove:"
+    echo -e "    • The daily schedule (if set up)"
+    echo -e "    • All files in ${BOLD}$INSTALL_DIR${NC}"
+    echo -e "    • The ${BOLD}news-digest${NC} command"
+    echo ""
+    echo -ne "  ${BOLD}Are you sure? [y/n]:${NC} "
+    read -r answer
+    case "$answer" in
+        [Yy]|[Yy][Ee][Ss]) ;;
+        *)
+            echo ""
+            echo -e "  ${GREEN}✔${NC}  Cancelled. Nothing was removed."
+            exit 0
+            ;;
+    esac
+
+    echo ""
+
+    # Step 1: Remove the daily schedule
+    if "$VENV_PYTHON" -c "from newsdigest.scheduler import is_schedule_installed; exit(0 if is_schedule_installed() else 1)" 2>/dev/null; then
+        echo -e "  ${DIM}Removing daily schedule...${NC}"
+        "$VENV_PYTHON" -c "from newsdigest.scheduler import uninstall_schedule; uninstall_schedule()"
+        echo -e "  ${GREEN}✔${NC}  Schedule removed."
+    else
+        echo -e "  ${DIM}No schedule to remove.${NC}"
+    fi
+
+    # Step 2: Remove the symlink (this script may be the symlink target!)
+    # Figure out where the symlink is before we delete the install dir
+    local link_path=""
+    if [ -L "/usr/local/bin/news-digest" ]; then
+        link_path="/usr/local/bin/news-digest"
+    elif [ -L "$HOME/.local/bin/news-digest" ]; then
+        link_path="$HOME/.local/bin/news-digest"
+    fi
+
+    # Step 3: Remove the install directory
+    echo -e "  ${DIM}Removing $INSTALL_DIR...${NC}"
+    rm -rf "$INSTALL_DIR"
+    echo -e "  ${GREEN}✔${NC}  Files removed."
+
+    # Step 4: Remove the symlink
+    if [ -n "$link_path" ]; then
+        echo -e "  ${DIM}Removing command: $link_path${NC}"
+        rm -f "$link_path" 2>/dev/null || {
+            echo -e "  ${YELLOW}⚠${NC}  Could not remove $link_path (may need sudo)"
+            echo -e "  ${DIM}Run: sudo rm $link_path${NC}"
+        }
+        echo -e "  ${GREEN}✔${NC}  Command removed."
+    fi
+
+    echo ""
+    echo -e "  ${GREEN}✔${NC}  ${BOLD}News Digest has been completely uninstalled.${NC}"
+    echo -e "  ${DIM}To reinstall, run the curl one-liner again.${NC}"
+    echo ""
+}
+
+cmd_status() {
+    check_install
+
+    echo ""
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${BOLD}  News Digest — Status${NC}"
+    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+
+    echo -e "  ${BOLD}Install location:${NC} $INSTALL_DIR"
+
+    # Python version
+    local pyver
+    pyver="$("$VENV_PYTHON" --version 2>&1)"
+    echo -e "  ${BOLD}Python:${NC}           $pyver"
+
+    # .env status
+    if [ -f "$INSTALL_DIR/.env" ]; then
+        echo -e "  ${BOLD}Configuration:${NC}    ${GREEN}✔ configured${NC}"
+    else
+        echo -e "  ${BOLD}Configuration:${NC}    ${RED}✘ not configured${NC} (run: news-digest setup)"
+    fi
+
+    # Schedule status
+    if "$VENV_PYTHON" -c "from newsdigest.scheduler import is_schedule_installed; exit(0 if is_schedule_installed() else 1)" 2>/dev/null; then
+        local sched_time
+        sched_time="$("$VENV_PYTHON" -c "from newsdigest.config import SCHEDULE_TIME; print(SCHEDULE_TIME)" 2>/dev/null || echo "unknown")"
+        echo -e "  ${BOLD}Daily schedule:${NC}   ${GREEN}✔ active${NC} (${sched_time})"
+    else
+        echo -e "  ${BOLD}Daily schedule:${NC}   ${DIM}not set${NC}"
+    fi
+
+    # Last sent
+    if [ -f "$INSTALL_DIR/.last_sent" ]; then
+        local last_mod
+        last_mod="$(date -r "$INSTALL_DIR/.last_sent" '+%Y-%m-%d %H:%M' 2>/dev/null || stat -c '%y' "$INSTALL_DIR/.last_sent" 2>/dev/null | cut -d. -f1 || echo "unknown")"
+        echo -e "  ${BOLD}Last sent:${NC}        $last_mod"
+    else
+        echo -e "  ${BOLD}Last sent:${NC}        ${DIM}never${NC}"
+    fi
+
+    echo ""
+}
+
+cmd_help() {
+    echo ""
+    echo -e "${BOLD}  News Digest${NC} — Daily news email digest"
+    echo ""
+    echo -e "  ${BOLD}Usage:${NC}"
+    echo -e "    news-digest ${CYAN}run${NC}              Send today's digest"
+    echo -e "    news-digest ${CYAN}run --dry${NC}        Preview without sending"
+    echo -e "    news-digest ${CYAN}run --force${NC}      Force re-send"
+    echo -e "    news-digest ${CYAN}setup${NC}            Re-run the setup wizard"
+    echo -e "    news-digest ${CYAN}uninstall${NC}        Remove everything"
+    echo -e "    news-digest ${CYAN}status${NC}           Show install info"
+    echo -e "    news-digest ${CYAN}help${NC}             Show this message"
+    echo ""
+}
+
+# ---------------------------------------------------------------------------
+# Main dispatch
+# ---------------------------------------------------------------------------
+case "${1:-}" in
+    run)        cmd_run "${2:-}" ;;
+    setup)      cmd_setup ;;
+    uninstall)  cmd_uninstall ;;
+    status)     cmd_status ;;
+    help|--help|-h) cmd_help ;;
+    "")         cmd_help ;;
+    *)
+        echo -e "  ${RED}✘${NC}  Unknown command: $1"
+        cmd_help
+        exit 1
+        ;;
+esac

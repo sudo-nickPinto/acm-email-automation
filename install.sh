@@ -147,9 +147,35 @@ rm -rf "$EXTRACT_DIR"
 echo -e "  ${GREEN}✔${NC}  Installed to ${BOLD}$INSTALL_DIR${NC}"
 
 # ---------------------------------------------------------------------------
-# Step 5: Make scripts executable and launch setup
+# Step 5: Make scripts executable and install CLI command
 # ---------------------------------------------------------------------------
 chmod +x "$INSTALL_DIR/start.sh"
+chmod +x "$INSTALL_DIR/news-digest"
+
+# Install the 'news-digest' command so it's available from anywhere.
+# Try /usr/local/bin first (default PATH on macOS), fall back to ~/.local/bin
+LINK_INSTALLED=false
+
+if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+    ln -sf "$INSTALL_DIR/news-digest" /usr/local/bin/news-digest
+    LINK_INSTALLED=true
+    echo -e "  ${GREEN}✔${NC}  Installed ${BOLD}news-digest${NC} command"
+else
+    # Try ~/.local/bin (common on Linux)
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "$INSTALL_DIR/news-digest" "$HOME/.local/bin/news-digest"
+    LINK_INSTALLED=true
+    echo -e "  ${GREEN}✔${NC}  Installed ${BOLD}news-digest${NC} command to ~/.local/bin"
+    # Check if ~/.local/bin is in PATH
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *)
+            echo -e "  ${YELLOW}⚠${NC}  ~/.local/bin is not in your PATH."
+            echo -e "  ${DIM}Add this line to your ~/.bashrc or ~/.zshrc:${NC}"
+            echo -e "  ${DIM}  export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
+            ;;
+    esac
+fi
 
 echo ""
 echo -e "  ${BOLD}Launching setup wizard...${NC}"
