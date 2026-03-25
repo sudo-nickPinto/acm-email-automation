@@ -22,6 +22,7 @@ newsdigest/           → Core package
   emailer.py          → Formats and sends multi-source digest email
   scheduler.py        → Installs/uninstalls daily schedule (LaunchAgent, cron, Task Scheduler)
 main.py               → Orchestrator: fetch → deduplicate → send
+tests/                → Test suite (pytest, 94 tests, fully offline)
 ```
 
 ## Key constraints
@@ -52,3 +53,4 @@ main.py               → Orchestrator: fetch → deduplicate → send
 - `venv/bin/python3 main.py --dry-run` — Preview without sending
 - `venv/bin/python3 main.py` — Send the digest
 - `venv/bin/python3 main.py --force` — Bypass duplicate detection
+- `venv/bin/python3 -m pytest tests/ -v` — Run the test suite (94 tests)

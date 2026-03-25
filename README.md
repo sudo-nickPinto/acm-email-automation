@@ -83,6 +83,14 @@ acm_email_automation/
 │   ├── emailer.py           # Formats + sends the email
 │   └── scheduler.py         # Installs daily schedule per OS
 ├── requirements.txt         # Python dependencies
+├── tests/                   # Test suite (pytest)
+│   ├── conftest.py          # Shared fixtures
+│   ├── test_sources.py      # Source registry tests
+│   ├── test_scraper.py      # RSS scraper tests
+│   ├── test_emailer.py      # Email formatter tests
+│   ├── test_scheduler.py    # Scheduler tests
+│   ├── test_config.py       # Config loading tests
+│   └── test_main.py         # Orchestrator tests
 ├── .env.example             # Template for configuration
 ├── docs/                    # Full documentation
 └── .gitignore
@@ -105,6 +113,14 @@ Re-run the setup wizard anytime:
 | "No articles found" | RSS feeds may be temporarily unavailable |
 | "Already sent this digest" | Use `--force` to resend, or wait for new articles |
 | Python not found after install | Close and reopen your terminal, then run `./start.sh` again |
+
+## Testing
+
+Run the test suite (94 tests, all offline — no network or email required):
+
+```bash
+venv/bin/python3 -m pytest tests/ -v
+```
 
 ## Documentation
 
