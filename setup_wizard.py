@@ -36,6 +36,13 @@ import re
 import sys
 from pathlib import Path
 
+# ---------------------------------------------------------------------------
+# If stdin is not a terminal (e.g., inherited from a curl|bash pipe),
+# reopen it from /dev/tty so that input() reads from the real terminal.
+# ---------------------------------------------------------------------------
+if not sys.stdin.isatty():
+    sys.stdin = open("/dev/tty", "r")
+
 # We import sources directly — this module has no dependencies beyond stdlib
 from newsdigest.sources import AVAILABLE_SOURCES, NewsSource
 from newsdigest.scheduler import install_schedule, uninstall_schedule, is_schedule_installed, detect_os

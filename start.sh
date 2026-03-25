@@ -15,6 +15,14 @@
 set -e
 
 # ---------------------------------------------------------------------------
+# If stdin is not a terminal (e.g., called from curl|bash), reconnect to
+# the real terminal so read prompts and Python input() work correctly.
+# ---------------------------------------------------------------------------
+if [ ! -t 0 ]; then
+    exec < /dev/tty
+fi
+
+# ---------------------------------------------------------------------------
 # Colors and formatting (makes the terminal output readable)
 # ---------------------------------------------------------------------------
 BOLD='\033[1m'

@@ -148,5 +148,11 @@ echo ""
 echo -e "  ${BOLD}Launching setup wizard...${NC}"
 echo ""
 
+# Reconnect stdin to the real terminal. When this script runs via
+# 'curl | bash', stdin is the curl pipe (already at EOF). We must
+# point it back to the actual terminal before launching start.sh,
+# otherwise every read/input() call downstream gets EOF instantly.
+exec < /dev/tty
+
 cd "$INSTALL_DIR"
-./start.sh < /dev/tty
+exec bash ./start.sh
