@@ -29,6 +29,7 @@ Interactive CLI menu for managing the News Digest installation.
 """
 
 import importlib
+import getpass
 import os
 import re
 import subprocess
@@ -46,18 +47,36 @@ YELLOW = "\033[1;33m"
 RED = "\033[0;31m"
 CYAN = "\033[0;36m"
 BLUE = "\033[0;34m"
+WHITE = "\033[1;37m"
 NC = "\033[0m"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_FILE = PROJECT_ROOT / ".env"
 VENV_PYTHON = PROJECT_ROOT / "venv" / "bin" / "python3"
 
+W = 55  # Display width for divider lines
+
+
+def _clear() -> None:
+    """Clear the terminal screen (only when connected to a real terminal)."""
+    if sys.stdout.isatty():
+        print("\033[2J\033[H", end="", flush=True)
+
+
+def _header(title: str) -> None:
+    """Display the main menu banner with prominent styling."""
+    print()
+    print(f"  {CYAN}{'━' * W}{NC}")
+    print(f"  {WHITE}  📰  {title}{NC}")
+    print(f"  {CYAN}{'━' * W}{NC}")
+
 
 def _banner(text: str) -> None:
+    """Display a sub-screen header."""
     print()
-    print(f"{CYAN}{'━' * 59}{NC}")
-    print(f"{BOLD}  {text}{NC}")
-    print(f"{CYAN}{'━' * 59}{NC}")
+    print(f"  {CYAN}{'─' * W}{NC}")
+    print(f"  {BOLD}  {text}{NC}")
+    print(f"  {CYAN}{'─' * W}{NC}")
     print()
 
 
@@ -80,7 +99,7 @@ def _info(text: str) -> None:
 def _pause() -> None:
     """Wait for user to press Enter before returning to the menu."""
     print()
-    input(f"  {DIM}Press Enter to return to the menu...{NC}")
+    input(f"  {DIM}Press Enter to continue ↵{NC} ")
 
 
 def _reload_config():
@@ -92,6 +111,17 @@ def _reload_config():
         os.environ.pop(key, None)
     importlib.reload(newsdigest.config)
     return newsdigest.config
+
+
+def _protect_env_file() -> None:
+    """Restrict .env readability on POSIX systems."""
+    if os.name == "nt" or not ENV_FILE.exists():
+        return
+
+    try:
+        ENV_FILE.chmod(0o600)
+    except OSError:
+        _warn("Couldn't tighten permissions for .env.")
 
 
 def _read_env() -> dict[str, str]:
@@ -115,6 +145,7 @@ def _write_env(env: dict[str, str]) -> None:
         if key in env:
             lines.append(f"{key}={env[key]}")
     ENV_FILE.write_text("\n".join(lines) + "\n")
+    _protect_env_file()
 
 
 # =============================================================================
@@ -152,30 +183,17 @@ def action_change_sources() -> None:
     env = _read_env()
     current = [s.strip() for s in env.get("SELECTED_SOURCES", "").split(",") if s.strip()]
 
-    print(f"  {BOLD}Current sources:{NC}")
-    if current:
-        for key in current:
-            from newsdigest.sources import get_source_by_key
-            src = get_source_by_key(key)
-            name = src.name if src else key
-            print(f"    • {name}")
-    else:
-        print(f"    {DIM}(none){NC}")
-    print()
-
-    print(f"  {BOLD}Available sources:{NC}")
-    print()
     for i, source in enumerate(AVAILABLE_SOURCES, start=1):
         marker = f"{GREEN}✔{NC}" if source.key in current else " "
-        print(f"    {marker} {BOLD}[{i}]{NC} {source.name}")
-        print(f"          {DIM}{source.description}{NC}")
+        print(f"    {marker}  {BOLD}[{i}]{NC}  {source.name}")
+        print(f"              {DIM}{source.description}{NC}")
     print()
 
     while True:
-        print(f"  Enter the numbers you want, separated by spaces.")
-        print(f"  {DIM}Example: 1 3 4  (or 'all' for everything){NC}")
+        print(f"  {DIM}Enter numbers separated by spaces, or 'all'{NC}")
+        print(f"  {DIM}Example: 1 3 4{NC}")
         print()
-        raw = input(f"  {BOLD}Your choices:{NC} ").strip()
+        raw = input(f"  {BOLD}Sources ▸{NC} ").strip()
 
         if not raw:
             _warn("Please select at least one source.")
@@ -268,10 +286,11 @@ def action_change_password() -> None:
     print(f"    1. Go to {BOLD}https://myaccount.google.com/apppasswords{NC}")
     print(f"    2. Create a new password named 'News Digest'")
     print(f"    3. Copy the 16-character password")
+    print(f"  {DIM}Your typing will be hidden for privacy.{NC}")
     print()
 
     while True:
-        password = input(f"  {BOLD}New App Password (or 'cancel'):{NC} ").strip()
+        password = getpass.getpass("  New App Password (or 'cancel'): ").strip()
 
         if password.lower() == "cancel":
             _info("Cancelled — password unchanged.")
@@ -320,13 +339,13 @@ def action_change_schedule() -> None:
         print(f"  {BOLD}Current schedule:{NC} {DIM}not set (manual only){NC}")
     print()
 
-    print(f"    {BOLD}[1]{NC} Set a new delivery time")
+    print(f"    {BOLD}[1]{NC}  Set a new delivery time")
     if scheduled:
-        print(f"    {BOLD}[2]{NC} Turn off automatic delivery")
-    print(f"    {BOLD}[0]{NC} Cancel")
+        print(f"    {BOLD}[2]{NC}  Turn off automatic delivery")
+    print(f"    {DIM}[0]  Cancel{NC}")
     print()
 
-    choice = input(f"  {BOLD}Your choice:{NC} ").strip()
+    choice = input(f"  {BOLD}▸{NC} ").strip()
 
     if choice == "0":
         _info("Cancelled — schedule unchanged.")
@@ -349,11 +368,11 @@ def action_change_schedule() -> None:
             return
 
         print()
-        print(f"  Enter delivery time in 24-hour format (e.g., 08:00, 18:30).")
+        print(f"  {DIM}Enter time in 24-hour format (e.g., 08:00, 18:30){NC}")
         print()
 
         while True:
-            time_input = input(f"  {BOLD}Delivery time [default: 08:00]:{NC} ").strip()
+            time_input = input(f"  {BOLD}Time [08:00] ▸{NC} ").strip()
 
             if not time_input:
                 time_input = "08:00"
@@ -395,12 +414,13 @@ def action_status() -> None:
     from newsdigest.sources import get_source_by_key
     from newsdigest.scheduler import is_schedule_installed
 
-    _banner("News Digest — Status")
+    _banner("Status")
 
     env = _read_env()
+    L = 18  # label column width for alignment
 
     # Install location
-    print(f"  {BOLD}Install location:{NC}  {PROJECT_ROOT}")
+    print(f"  {BOLD}{'Install path:':<{L}}{NC} {PROJECT_ROOT}")
 
     # Python version
     try:
@@ -408,16 +428,16 @@ def action_status() -> None:
             [str(VENV_PYTHON), "--version"],
             capture_output=True, text=True,
         ).stdout.strip()
-        print(f"  {BOLD}Python:{NC}            {pyver}")
+        print(f"  {BOLD}{'Python:':<{L}}{NC} {pyver}")
     except FileNotFoundError:
-        print(f"  {BOLD}Python:{NC}            {RED}not found{NC}")
+        print(f"  {BOLD}{'Python:':<{L}}{NC} {RED}not found{NC}")
 
     # Email
     email = env.get("SMTP_EMAIL", "")
     if email:
-        print(f"  {BOLD}Email:{NC}             {email}")
+        print(f"  {BOLD}{'Email:':<{L}}{NC} {email}")
     else:
-        print(f"  {BOLD}Email:{NC}             {RED}not configured{NC}")
+        print(f"  {BOLD}{'Email:':<{L}}{NC} {RED}not configured{NC}")
 
     # Sources
     sources_raw = env.get("SELECTED_SOURCES", "")
@@ -427,19 +447,19 @@ def action_status() -> None:
         for key in source_keys:
             src = get_source_by_key(key)
             names.append(src.name if src else key)
-        print(f"  {BOLD}Sources:{NC}           {', '.join(names)}")
+        print(f"  {BOLD}{'Sources:':<{L}}{NC} {', '.join(names)}")
     else:
-        print(f"  {BOLD}Sources:{NC}           {RED}none selected{NC}")
+        print(f"  {BOLD}{'Sources:':<{L}}{NC} {RED}none selected{NC}")
 
     # Schedule
     sched_time = env.get("SCHEDULE_TIME", "")
     scheduled = is_schedule_installed()
     if scheduled and sched_time:
-        print(f"  {BOLD}Daily schedule:{NC}    {GREEN}✔ active{NC} (daily at {sched_time})")
+        print(f"  {BOLD}{'Schedule:':<{L}}{NC} {GREEN}✔ active{NC} — daily at {sched_time}")
     elif sched_time:
-        print(f"  {BOLD}Daily schedule:{NC}    {YELLOW}⚠ configured but not active{NC}")
+        print(f"  {BOLD}{'Schedule:':<{L}}{NC} {YELLOW}⚠ configured but not active{NC}")
     else:
-        print(f"  {BOLD}Daily schedule:{NC}    {DIM}off (manual only){NC}")
+        print(f"  {BOLD}{'Schedule:':<{L}}{NC} {DIM}off (manual only){NC}")
 
     # Last sent
     state_file = PROJECT_ROOT / ".last_sent"
@@ -447,9 +467,9 @@ def action_status() -> None:
         import datetime
         mtime = state_file.stat().st_mtime
         dt = datetime.datetime.fromtimestamp(mtime)
-        print(f"  {BOLD}Last sent:{NC}         {dt.strftime('%Y-%m-%d %H:%M')}")
+        print(f"  {BOLD}{'Last sent:':<{L}}{NC} {dt.strftime('%Y-%m-%d %H:%M')}")
     else:
-        print(f"  {BOLD}Last sent:{NC}         {DIM}never{NC}")
+        print(f"  {BOLD}{'Last sent:':<{L}}{NC} {DIM}never{NC}")
 
     _pause()
 
@@ -458,15 +478,17 @@ def action_uninstall() -> None:
     """Uninstall News Digest completely."""
     _banner("Uninstall News Digest")
 
-    print(f"  This will remove:")
-    print(f"    • The daily schedule (if set up)")
-    print(f"    • All files in {BOLD}{PROJECT_ROOT}{NC}")
-    print(f"    • The {BOLD}news-digest{NC} command")
+    print(f"  {RED}{BOLD}⚠  This action cannot be undone.{NC}")
+    print()
+    print(f"  The following will be permanently removed:")
+    print(f"    •  Daily schedule {DIM}(if active){NC}")
+    print(f"    •  All project files in {BOLD}{PROJECT_ROOT}{NC}")
+    print(f"    •  The {BOLD}news-digest{NC} command")
     print()
 
-    answer = input(f"  {BOLD}Are you sure? [y/n]:{NC} ").strip().lower()
+    answer = input(f"  {BOLD}Type 'yes' to confirm (or anything else to cancel):{NC} ").strip().lower()
     if answer not in ("y", "yes"):
-        _info("Cancelled. Nothing was removed.")
+        _info("Cancelled — nothing was removed.")
         return
 
     print()
@@ -550,31 +572,55 @@ def show_menu() -> None:
             pass
 
     while True:
-        _banner("News Digest")
+        _clear()
+        _header("News Digest")
 
-        # Show a quick status line
+        # ── Status bar ──────────────────────────────────────────
         env = _read_env()
         email = env.get("SMTP_EMAIL", "")
+        sources_raw = env.get("SELECTED_SOURCES", "")
+        source_count = len([s for s in sources_raw.split(",") if s.strip()])
         sched = env.get("SCHEDULE_TIME", "")
-        if email:
-            status_line = f"  Logged in as {BOLD}{email}{NC}"
-            if sched:
-                status_line += f"  •  Auto-delivery at {GREEN}{sched}{NC}"
-            print(status_line)
-            print()
 
-        for key, label, _ in MENU_OPTIONS:
-            if key == "9":
-                # Visual separator before destructive action
-                print()
-            print(f"    {BOLD}[{key}]{NC}  {label}")
+        if email:
+            parts = [email]
+            if source_count:
+                parts.append(f"{source_count} source{'s' if source_count != 1 else ''}")
+            if sched:
+                parts.append(f"Daily at {sched}")
+            else:
+                parts.append("Manual delivery")
+            print(f"  {DIM}{'  ·  '.join(parts)}{NC}")
+
+        # ── Send ────────────────────────────────────────────────
+        print()
+        print(f"  {CYAN}── Send {'─' * (W - 9)}{NC}")
+        print(f"    {BOLD}[1]{NC}  Send digest now")
+        print(f"    {BOLD}[2]{NC}  Preview digest {DIM}(dry run){NC}")
+        print(f"    {BOLD}[3]{NC}  Force re-send")
+
+        # ── Settings ────────────────────────────────────────────
+        print()
+        print(f"  {CYAN}── Settings {'─' * (W - 13)}{NC}")
+        print(f"    {BOLD}[4]{NC}  News sources")
+        print(f"    {BOLD}[5]{NC}  Email address")
+        print(f"    {BOLD}[6]{NC}  App password")
+        print(f"    {BOLD}[7]{NC}  Delivery schedule")
+
+        # ── System ──────────────────────────────────────────────
+        print()
+        print(f"  {CYAN}{'─' * W}{NC}")
+        print(f"    {BOLD}[8]{NC}  Status")
+        print(f"    {RED}[9]  Uninstall{NC}")
+        print(f"    {DIM}[0]  Exit{NC}")
 
         print()
-        choice = input(f"  {BOLD}Choose an option:{NC} ").strip()
+        choice = input(f"  {BOLD}▸{NC} ").strip()
 
         if choice == "0":
+            _clear()
             print()
-            print(f"  {DIM}Goodbye!{NC}")
+            print(f"  {DIM}👋 Goodbye!{NC}")
             print()
             break
 
