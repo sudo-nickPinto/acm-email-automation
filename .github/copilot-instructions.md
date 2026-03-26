@@ -24,7 +24,7 @@ newsdigest/           → Core package
   cli.py              → Interactive menu system (launched by `news-digest` with no args)
 main.py               → Orchestrator: fetch → deduplicate → send
 news-digest           → Global CLI command (bash, symlinked to /usr/local/bin)
-tests/                → Test suite (pytest, 122 tests, fully offline)
+tests/                → Test suite (pytest, 150 tests, fully offline)
 ```
 
 ## Key constraints
@@ -56,4 +56,4 @@ tests/                → Test suite (pytest, 122 tests, fully offline)
 - `venv/bin/python3 main.py` — Send the digest
 - `venv/bin/python3 main.py --force` — Bypass duplicate detection
 - `news-digest` — Launch interactive menu (send, preview, change settings, uninstall)
-- `venv/bin/python3 -m pytest tests/ -v` — Run the test suite (122 tests)
+- `venv/bin/python3 -m pytest tests/ -v` — Run the test suite (150 tests)

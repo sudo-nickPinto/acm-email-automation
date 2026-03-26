@@ -107,6 +107,15 @@ def build_plain_text(results: list[SourceResult]) -> str:
             lines.append("")
             continue
 
+        if result.no_new_today:
+            lines.append(f"{'=' * 50}")
+            lines.append(f"  {result.source.name}")
+            lines.append(f"{'=' * 50}")
+            lines.append("")
+            lines.append("  No new articles published today.")
+            lines.append("")
+            continue
+
         if not result.articles:
             continue
 
@@ -162,6 +171,19 @@ def build_html(results: list[SourceResult]) -> str:
             source_blocks.append(f"""
     <div style="margin-bottom:24px;padding:12px 16px;background:#fff3cd;border-left:4px solid #ffc107;border-radius:4px;">
       <strong>⚠ {source_name}</strong> — {error_html}
+    </div>""")
+            continue
+
+        if result.no_new_today:
+            source_name = _escape_html_text(result.source.name)
+            source_blocks.append(f"""
+    <div style="margin-bottom:32px;">
+      <div style="background:{color};color:white;padding:10px 16px;border-radius:6px 6px 0 0;">
+        <h2 style="margin:0;font-size:16px;font-weight:bold;">{source_name}</h2>
+      </div>
+      <div style="border:1px solid #e0e0e0;border-top:none;border-radius:0 0 6px 6px;padding:24px 16px;text-align:center;">
+        <p style="margin:0;color:#888;font-size:14px;font-style:italic;">No new articles published today.</p>
+      </div>
     </div>""")
             continue
 

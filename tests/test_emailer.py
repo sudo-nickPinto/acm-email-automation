@@ -225,3 +225,72 @@ class TestSendEmail:
         assert "multipart/alternative" in raw_msg
         assert "text/plain" in raw_msg
         assert "text/html" in raw_msg
+
+
+# ---------------------------------------------------------------------------
+# No new articles today rendering
+# ---------------------------------------------------------------------------
+
+class TestNoNewToday:
+
+    def _make_stale_result(self) -> list[SourceResult]:
+        source = NewsSource(
+            key="acm", name="ACM TechNews", description="d",
+            rss_url="https://example.com/rss", max_articles=5,
+        )
+        return [SourceResult(source=source, articles=[], no_new_today=True)]
+
+    def test_plain_text_shows_no_new_message(self):
+        text = build_plain_text(self._make_stale_result())
+        assert "ACM TechNews" in text
+        assert "No new articles published today" in text
+
+    def test_html_shows_no_new_message(self):
+        result = build_html(self._make_stale_result())
+        assert "ACM TechNews" in result
+        assert "No new articles published today" in result
+
+    def test_plain_text_mixed_fresh_and_stale(self):
+        fresh_source = NewsSource(
+            key="bbc", name="BBC News", description="d",
+            rss_url="https://example.com/rss", max_articles=5,
+        )
+        stale_source = NewsSource(
+            key="acm", name="ACM TechNews", description="d",
+            rss_url="https://example.com/rss", max_articles=5,
+        )
+        article = Article(
+            title="Fresh Article", description="desc",
+            link="https://example.com/1", source_name="BBC News",
+        )
+        results = [
+            SourceResult(source=fresh_source, articles=[article]),
+            SourceResult(source=stale_source, articles=[], no_new_today=True),
+        ]
+        text = build_plain_text(results)
+        assert "Fresh Article" in text
+        assert "BBC News" in text
+        assert "ACM TechNews" in text
+        assert "No new articles published today" in text
+
+    def test_html_mixed_fresh_and_stale(self):
+        fresh_source = NewsSource(
+            key="bbc", name="BBC News", description="d",
+            rss_url="https://example.com/rss", max_articles=5,
+        )
+        stale_source = NewsSource(
+            key="acm", name="ACM TechNews", description="d",
+            rss_url="https://example.com/rss", max_articles=5,
+        )
+        article = Article(
+            title="Fresh Article", description="desc",
+            link="https://example.com/1", source_name="BBC News",
+        )
+        results = [
+            SourceResult(source=fresh_source, articles=[article]),
+            SourceResult(source=stale_source, articles=[], no_new_today=True),
+        ]
+        result = build_html(results)
+        assert "Fresh Article" in result
+        assert "ACM TechNews" in result
+        assert "No new articles published today" in result

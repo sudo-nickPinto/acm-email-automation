@@ -32,9 +32,10 @@ Fetches articles from selected newspaper sources and emails a formatted digest.
 
 import hashlib
 import sys
+from datetime import date
 from pathlib import Path
 
-from newsdigest.scraper import fetch_all_sources, SourceResult
+from newsdigest.scraper import fetch_all_sources, SourceResult, _is_published_today
 from newsdigest.emailer import send_email, build_plain_text
 from newsdigest.config import SELECTED_SOURCES
 
@@ -54,7 +55,7 @@ def _results_hash(results: list[SourceResult]) -> str:
         for article in result.articles:
             all_titles.append(article.title)
 
-    combined = "|".join(all_titles)
+    combined = f"{date.today().isoformat()}|" + "|".join(all_titles)
     return hashlib.sha256(combined.encode()).hexdigest()
 
 
@@ -99,18 +100,37 @@ def main():
     print()
     results = fetch_all_sources()
 
-    # Count total articles across all sources
+    # Step 1b: Filter to today's articles, flag stale sources
+    for result in results:
+        if result.error:
+            continue
+        fresh = [a for a in result.articles if _is_published_today(a.pub_date)]
+        if not fresh and result.articles:
+            # Source has articles but none published today
+            result.no_new_today = True
+        result.articles = fresh
+
+    # Count totals after filtering
     total = sum(len(r.articles) for r in results)
     errors = sum(1 for r in results if r.error)
+    stale = sum(1 for r in results if r.no_new_today)
+    valid_sources = len(results) - errors
 
     print()
-    if total == 0:
+    if valid_sources == 0:
         print("No articles found from any source.")
         if errors > 0:
             print(f"{errors} source(s) had errors — check your internet connection.")
         sys.exit(1)
 
-    print(f"Total: {total} articles from {len(results) - errors} source(s).")
+    if total == 0 and stale == 0:
+        print("No articles found from any source.")
+        sys.exit(1)
+
+    if total > 0:
+        print(f"Total: {total} new article(s) from {valid_sources - stale} source(s).")
+    if stale > 0:
+        print(f"{stale} source(s) had no new articles today.")
 
     # Step 2: Hash and check for duplicates
     current_hash = _results_hash(results)

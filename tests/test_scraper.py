@@ -15,6 +15,8 @@ from newsdigest.scraper import (
     SourceResult,
     _clean_html,
     _fetch_single_source,
+    _parse_pub_date,
+    _is_published_today,
     fetch_all_sources,
     fetch_single_source_by_key,
     REQUEST_TIMEOUT,
@@ -228,3 +230,53 @@ class TestConstants:
 
     def test_request_timeout_positive(self):
         assert REQUEST_TIMEOUT > 0
+
+
+# ---------------------------------------------------------------------------
+# _parse_pub_date / _is_published_today
+# ---------------------------------------------------------------------------
+
+class TestParsePubDate:
+
+    def test_valid_rfc822(self):
+        result = _parse_pub_date("Mon, 01 Jan 2026 08:00:00 GMT")
+        assert result is not None
+        assert result.year == 2026
+        assert result.month == 1
+        assert result.day == 1
+
+    def test_empty_string(self):
+        assert _parse_pub_date("") is None
+
+    def test_none_input(self):
+        assert _parse_pub_date("") is None
+
+    def test_invalid_string(self):
+        assert _parse_pub_date("not a date") is None
+
+    def test_returns_date_not_datetime(self):
+        from datetime import date
+        result = _parse_pub_date("Mon, 01 Jan 2026 08:00:00 GMT")
+        assert type(result) is date
+
+
+class TestIsPublishedToday:
+
+    def test_today_returns_true(self):
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        rfc822 = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
+        assert _is_published_today(rfc822) is True
+
+    def test_old_date_returns_false(self):
+        assert _is_published_today("Mon, 01 Jan 2024 08:00:00 GMT") is False
+
+    def test_empty_returns_false(self):
+        assert _is_published_today("") is False
+
+    def test_source_result_no_new_today_default(self):
+        from newsdigest.sources import NewsSource
+        s = NewsSource(key="t", name="T", description="d",
+                       rss_url="https://x.com/rss", max_articles=5)
+        r = SourceResult(source=s, articles=[])
+        assert r.no_new_today is False

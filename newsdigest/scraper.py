@@ -29,6 +29,8 @@ import html
 import re
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
+from datetime import date
+from email.utils import parsedate_to_datetime
 
 import requests
 
@@ -72,6 +74,35 @@ class SourceResult:
     source: NewsSource
     articles: list[Article] = field(default_factory=list)
     error: str = ""
+    no_new_today: bool = False
+
+
+def _parse_pub_date(pub_date_str: str) -> date | None:
+    """
+    Parse an RSS pubDate string (RFC 822) into a local date.
+
+    Converts to the user's local timezone before extracting the date,
+    so "today" comparisons match what the user expects.
+
+    Returns None if the string is empty or unparseable.
+    """
+    if not pub_date_str:
+        return None
+    try:
+        dt = parsedate_to_datetime(pub_date_str)
+        return dt.astimezone().date()
+    except (ValueError, TypeError):
+        return None
+
+
+def _is_published_today(pub_date_str: str) -> bool:
+    """
+    Check if an article's pubDate falls on today's date (local time).
+    """
+    pub = _parse_pub_date(pub_date_str)
+    if pub is None:
+        return False
+    return pub == date.today()
 
 
 def _clean_html(raw_html: str) -> str:

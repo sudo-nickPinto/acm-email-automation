@@ -175,7 +175,7 @@ Or re-run the full setup wizard:
 
 ## Testing
 
-Run the test suite (131 tests, all offline — no network or email required):
+Run the test suite (150 tests, all offline — no network or email required):
 
 ```bash
 venv/bin/python3 -m pytest tests/ -v

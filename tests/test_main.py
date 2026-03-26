@@ -164,3 +164,72 @@ class TestMain:
             with pytest.raises(SystemExit):
                 main()
         mock_send.assert_not_called()
+
+    @patch("main._save_state")
+    @patch("main.send_email")
+    @patch("main.fetch_all_sources")
+    @patch("main._already_sent", return_value=False)
+    @patch("main.SELECTED_SOURCES", ["acm_technews", "bbc_tech"])
+    def test_stale_source_still_sends(
+        self, mock_already, mock_fetch, mock_send, mock_save
+    ):
+        """When one source has no new articles today, email still sends."""
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc)
+        today_rfc822 = now.strftime("%a, %d %b %Y %H:%M:%S +0000")
+
+        fresh_source = NewsSource(
+            key="bbc", name="BBC", description="d",
+            rss_url="https://x.com/rss", max_articles=5,
+        )
+        stale_source = NewsSource(
+            key="acm", name="ACM", description="d",
+            rss_url="https://x.com/rss", max_articles=5,
+        )
+        fresh_article = Article(
+            title="Today", description="d",
+            link="https://x.com", source_name="BBC",
+            pub_date=today_rfc822,
+        )
+        old_article = Article(
+            title="Old", description="d",
+            link="https://x.com", source_name="ACM",
+            pub_date="Mon, 01 Jan 2024 08:00:00 GMT",
+        )
+        mock_fetch.return_value = [
+            SourceResult(source=fresh_source, articles=[fresh_article]),
+            SourceResult(source=stale_source, articles=[old_article]),
+        ]
+        with patch("sys.argv", ["main.py"]):
+            main()
+        mock_send.assert_called_once()
+        # Verify the stale source got flagged
+        sent_results = mock_send.call_args[0][0]
+        stale_results = [r for r in sent_results if r.no_new_today]
+        assert len(stale_results) == 1
+        assert stale_results[0].source.key == "acm"
+
+    @patch("main._save_state")
+    @patch("main.send_email")
+    @patch("main.fetch_all_sources")
+    @patch("main._already_sent", return_value=False)
+    @patch("main.SELECTED_SOURCES", ["acm_technews"])
+    def test_all_stale_still_sends(
+        self, mock_already, mock_fetch, mock_send, mock_save
+    ):
+        """When ALL sources are stale (no articles today), email still sends."""
+        stale_source = NewsSource(
+            key="acm", name="ACM", description="d",
+            rss_url="https://x.com/rss", max_articles=5,
+        )
+        old_article = Article(
+            title="Old", description="d",
+            link="https://x.com", source_name="ACM",
+            pub_date="Mon, 01 Jan 2024 08:00:00 GMT",
+        )
+        mock_fetch.return_value = [
+            SourceResult(source=stale_source, articles=[old_article]),
+        ]
+        with patch("sys.argv", ["main.py"]):
+            main()
+        mock_send.assert_called_once()
