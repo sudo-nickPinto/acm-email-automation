@@ -21,8 +21,10 @@ newsdigest/           → Core package
   scraper.py          → Fetches/parses RSS feeds (multi-source)
   emailer.py          → Formats and sends multi-source digest email
   scheduler.py        → Installs/uninstalls daily schedule (LaunchAgent, cron, Task Scheduler)
+  cli.py              → Interactive menu system (launched by `news-digest` with no args)
 main.py               → Orchestrator: fetch → deduplicate → send
-tests/                → Test suite (pytest, 94 tests, fully offline)
+news-digest           → Global CLI command (bash, symlinked to /usr/local/bin)
+tests/                → Test suite (pytest, 122 tests, fully offline)
 ```
 
 ## Key constraints
@@ -53,4 +55,5 @@ tests/                → Test suite (pytest, 94 tests, fully offline)
 - `venv/bin/python3 main.py --dry-run` — Preview without sending
 - `venv/bin/python3 main.py` — Send the digest
 - `venv/bin/python3 main.py --force` — Bypass duplicate detection
-- `venv/bin/python3 -m pytest tests/ -v` — Run the test suite (94 tests)
+- `news-digest` — Launch interactive menu (send, preview, change settings, uninstall)
+- `venv/bin/python3 -m pytest tests/ -v` — Run the test suite (122 tests)

@@ -58,12 +58,28 @@ The setup wizard:
 3. Optionally sets up **automatic daily delivery** (LaunchAgent on macOS, cron on Linux, Task Scheduler on Windows)
 4. Offers to send a test email
 
-After setup, your digest arrives automatically — or you can send it manually anytime:
+After setup, your digest arrives automatically — or manage everything through the interactive menu:
 
 ```bash
-venv/bin/python3 main.py            # Send the digest
-venv/bin/python3 main.py --dry-run  # Preview without sending
-venv/bin/python3 main.py --force    # Resend even if already sent today
+news-digest                         # Launch interactive menu
+```
+
+The menu lets you:
+- Send your digest now, preview it, or force-resend
+- Change your newspaper sources, email, or app password
+- Adjust or disable automatic scheduling
+- View current status
+- Uninstall everything
+
+You can also run commands directly:
+
+```bash
+news-digest run                     # Send the digest
+news-digest run --dry-run            # Preview without sending
+news-digest run --force              # Resend even if already sent today
+news-digest status                   # Show current configuration
+news-digest setup                    # Re-run the setup wizard
+news-digest uninstall                # Remove everything
 ```
 
 ## Project Structure
@@ -75,13 +91,15 @@ acm_email_automation/
 ├── start.sh                 # Bootstrap + setup wizard launcher
 ├── setup_wizard.py          # Interactive terminal setup
 ├── main.py                  # Entry point / orchestrator
+├── news-digest              # Global CLI command (symlinked to /usr/local/bin)
 ├── newsdigest/              # Core Python package
 │   ├── __init__.py
 │   ├── config.py            # Loads settings from .env
 │   ├── sources.py           # Registry of newspaper RSS feeds
 │   ├── scraper.py           # Fetches + parses RSS feeds
 │   ├── emailer.py           # Formats + sends the email
-│   └── scheduler.py         # Installs daily schedule per OS
+│   ├── scheduler.py         # Installs daily schedule per OS
+│   └── cli.py               # Interactive menu system
 ├── requirements.txt         # Python dependencies
 ├── tests/                   # Test suite (pytest)
 │   ├── conftest.py          # Shared fixtures
@@ -90,7 +108,8 @@ acm_email_automation/
 │   ├── test_emailer.py      # Email formatter tests
 │   ├── test_scheduler.py    # Scheduler tests
 │   ├── test_config.py       # Config loading tests
-│   └── test_main.py         # Orchestrator tests
+│   ├── test_main.py         # Orchestrator tests
+│   └── test_cli.py          # Interactive menu tests
 ├── .env.example             # Template for configuration
 ├── docs/                    # Full documentation
 └── .gitignore
@@ -98,7 +117,13 @@ acm_email_automation/
 
 ## Changing Your Settings
 
-Re-run the setup wizard anytime:
+Use the interactive menu:
+
+```bash
+news-digest
+```
+
+Or re-run the full setup wizard:
 
 ```bash
 ./start.sh
@@ -116,7 +141,7 @@ Re-run the setup wizard anytime:
 
 ## Testing
 
-Run the test suite (94 tests, all offline — no network or email required):
+Run the test suite (122 tests, all offline — no network or email required):
 
 ```bash
 venv/bin/python3 -m pytest tests/ -v

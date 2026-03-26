@@ -6,6 +6,7 @@
 # After installation, this command is available from anywhere in the terminal.
 #
 # Usage:
+#   news-digest              Launch interactive menu (recommended)
 #   news-digest run          Send today's digest
 #   news-digest run --dry    Preview without sending
 #   news-digest run --force  Force re-send even if already sent
@@ -192,6 +193,7 @@ cmd_help() {
     echo -e "${BOLD}  News Digest${NC} — Daily news email digest"
     echo ""
     echo -e "  ${BOLD}Usage:${NC}"
+    echo -e "    news-digest                  ${DIM}Launch interactive menu${NC}"
     echo -e "    news-digest ${CYAN}run${NC}              Send today's digest"
     echo -e "    news-digest ${CYAN}run --dry${NC}        Preview without sending"
     echo -e "    news-digest ${CYAN}run --force${NC}      Force re-send"
@@ -200,6 +202,11 @@ cmd_help() {
     echo -e "    news-digest ${CYAN}status${NC}           Show install info"
     echo -e "    news-digest ${CYAN}help${NC}             Show this message"
     echo ""
+}
+
+cmd_menu() {
+    check_install
+    "$VENV_PYTHON" -m newsdigest.cli
 }
 
 # ---------------------------------------------------------------------------
@@ -211,7 +218,7 @@ case "${1:-}" in
     uninstall)  cmd_uninstall ;;
     status)     cmd_status ;;
     help|--help|-h) cmd_help ;;
-    "")         cmd_help ;;
+    "")         cmd_menu ;;
     *)
         echo -e "  ${RED}✘${NC}  Unknown command: $1"
         cmd_help
