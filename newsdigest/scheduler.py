@@ -37,6 +37,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from newsdigest.paths import venv_python_path
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -48,9 +50,7 @@ SCHEDULE_LABEL = "com.newsdigest.daily"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # Full path to the venv python so the schedule doesn't depend on PATH
-VENV_PYTHON = PROJECT_ROOT / "venv" / "bin" / "python3"
-if platform.system() == "Windows":
-    VENV_PYTHON = PROJECT_ROOT / "venv" / "Scripts" / "python.exe"
+VENV_PYTHON = venv_python_path(PROJECT_ROOT)
 
 MAIN_PY = PROJECT_ROOT / "main.py"
 LOGS_DIR = PROJECT_ROOT / "logs"

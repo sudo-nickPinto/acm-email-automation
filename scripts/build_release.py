@@ -40,7 +40,9 @@ EXCLUDED_FILES = {
     "install.ps1",
 }
 MANDATORY_PACKAGE_FILES = (
+    Path("news-digest.ps1"),
     Path("requirements.lock"),
+    Path("newsdigest/paths.py"),
 )
 
 

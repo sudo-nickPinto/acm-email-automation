@@ -77,9 +77,11 @@ class TestBuildReleaseArtifacts:
         (project_root / "requirements.lock").write_text("requests==2.33.0\n")
         (project_root / "install.sh").write_text("#!/bin/bash\n")
         (project_root / "install.ps1").write_text("Write-Host 'hi'\n")
+        (project_root / "news-digest.ps1").write_text("Write-Host 'launcher'\n")
         newsdigest_dir = project_root / "newsdigest"
         newsdigest_dir.mkdir()
         (newsdigest_dir / "__init__.py").write_text("")
+        (newsdigest_dir / "paths.py").write_text("from pathlib import Path\n")
 
         with patch.object(build_release, "PROJECT_ROOT", project_root), \
                 patch.object(build_release, "DIST_DIR", dist_dir), \
@@ -87,7 +89,9 @@ class TestBuildReleaseArtifacts:
                 patch.object(build_release, "tracked_files", return_value=[
                     Path("README.md"),
                     Path("main.py"),
+                    Path("news-digest.ps1"),
                     Path("newsdigest/__init__.py"),
+                    Path("newsdigest/paths.py"),
                     Path("requirements.lock"),
                 ]):
             result = build_release.main()
@@ -123,6 +127,8 @@ class TestBuildReleaseArtifacts:
         assert names == [
             "news-digest/README.md",
             "news-digest/main.py",
+            "news-digest/news-digest.ps1",
             "news-digest/newsdigest/__init__.py",
+            "news-digest/newsdigest/paths.py",
             "news-digest/requirements.lock",
         ]

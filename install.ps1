@@ -42,7 +42,8 @@ $InstallDir = if ($env:NEWSDIGEST_INSTALL_DIR) {
     Join-Path $HOME "news-digest"
 }
 $SkipLaunch = $env:NEWSDIGEST_SKIP_LAUNCH -eq "1"
-$TempRoot = Join-Path $env:TEMP ("news-digest-install-" + [System.Guid]::NewGuid().ToString("N"))
+$TempBase = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+$TempRoot = Join-Path $TempBase ("news-digest-install-" + [System.Guid]::NewGuid().ToString("N"))
 $ZipFile = Join-Path $TempRoot "news-digest-download.zip"
 $ChecksumFile = Join-Path $TempRoot "SHA256SUMS.txt"
 $ExtractDir = Join-Path $TempRoot "extracted"
@@ -51,6 +52,54 @@ function Cleanup-Temp {
     if (Test-Path $TempRoot) {
         Remove-Item -Recurse -Force $TempRoot -ErrorAction SilentlyContinue
     }
+}
+
+function Assert-LastExitCode {
+    param([string]$Step)
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  $Step failed." -ForegroundColor Red
+        Write-Host "  Exit code: $LASTEXITCODE" -ForegroundColor DarkGray
+        exit $LASTEXITCODE
+    }
+}
+
+function Install-CommandWrapper {
+    $BinDir = Join-Path $HOME "AppData\Local\NewsDigest\bin"
+    $WrapperPath = Join-Path $BinDir "news-digest.cmd"
+    $LauncherPath = Join-Path $InstallDir "news-digest.ps1"
+    $PowerShellExe = if ($env:SystemRoot) {
+        Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe"
+    } else {
+        "pwsh"
+    }
+
+    New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
+
+    $wrapperContent = @(
+        "@echo off",
+        "`"$PowerShellExe`" -NoProfile -ExecutionPolicy Bypass -File `"$LauncherPath`" %*"
+    ) -join "`r`n"
+    Set-Content -Path $WrapperPath -Value $wrapperContent -Encoding ASCII
+
+    if ($IsWindows) {
+        $currentUserPath = [Environment]::GetEnvironmentVariable("Path", "User")
+        $pathEntries = @()
+        if ($currentUserPath) {
+            $pathEntries = $currentUserPath -split ';' | Where-Object { $_ }
+        }
+
+        if ($pathEntries -notcontains $BinDir) {
+            $newUserPath = if ($currentUserPath) { "$currentUserPath;$BinDir" } else { $BinDir }
+            [Environment]::SetEnvironmentVariable("Path", $newUserPath, "User")
+        }
+    }
+
+    if (-not (($env:Path -split [System.IO.Path]::PathSeparator) -contains $BinDir)) {
+        $env:Path = "$BinDir$([System.IO.Path]::PathSeparator)$env:Path"
+    }
+
+    Write-Host "  Installed news-digest command to $BinDir" -ForegroundColor Green
 }
 
 New-Item -ItemType Directory -Path $TempRoot -Force | Out-Null
@@ -158,7 +207,7 @@ if ($ExtractedFolder.Name -ne "news-digest") {
     exit 1
 }
 
-foreach ($requiredPath in @("start.sh", "news-digest", "setup_wizard.py")) {
+foreach ($requiredPath in @("start.sh", "news-digest", "news-digest.ps1", "setup_wizard.py")) {
     if (-not (Test-Path (Join-Path $ExtractedFolder.FullName $requiredPath))) {
         Write-Host "  Extraction failed — package is missing $requiredPath." -ForegroundColor Red
         Cleanup-Temp
@@ -228,6 +277,7 @@ Write-Host "  Setting up Python environment..." -ForegroundColor Cyan
 Set-Location $InstallDir
 
 & $PythonCmd -m venv venv
+Assert-LastExitCode "Virtual environment creation"
 
 $VenvPython = Join-Path $InstallDir "venv\Scripts\python.exe"
 $VenvPip = Join-Path $InstallDir "venv\Scripts\pip.exe"
@@ -236,10 +286,20 @@ if (-not (Test-Path $RequirementsFile)) {
     $RequirementsFile = Join-Path $InstallDir "requirements.txt"
 }
 
+if (-not (Test-Path $VenvPython) -or -not (Test-Path $VenvPip)) {
+    Write-Host "  Virtual environment layout is incomplete." -ForegroundColor Red
+    Write-Host "  Expected $VenvPython and $VenvPip" -ForegroundColor DarkGray
+    exit 1
+}
+
 & $VenvPip install --quiet --upgrade pip 2>$null
+Assert-LastExitCode "pip upgrade"
 & $VenvPip install --quiet -r $RequirementsFile
+Assert-LastExitCode "Dependency installation"
 
 Write-Host "  All packages installed." -ForegroundColor Green
+
+Install-CommandWrapper
 
 # ---------------------------------------------------------------------------
 # Step 6: Launch the setup wizard
@@ -255,3 +315,4 @@ Write-Host "  Launching setup wizard..." -ForegroundColor White
 Write-Host ""
 
 & $VenvPython (Join-Path $InstallDir "setup_wizard.py")
+Assert-LastExitCode "Setup wizard launch"
