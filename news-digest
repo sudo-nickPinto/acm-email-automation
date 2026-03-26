@@ -8,7 +8,7 @@
 # Usage:
 #   news-digest              Launch interactive menu (recommended)
 #   news-digest run          Send today's digest
-#   news-digest run --dry    Preview without sending
+#   news-digest run --dry-run Preview without sending
 #   news-digest run --force  Force re-send even if already sent
 #   news-digest setup        Re-run the setup wizard
 #   news-digest uninstall    Remove everything (schedule, files, command)
@@ -43,7 +43,8 @@ check_install() {
     if [ ! -d "$INSTALL_DIR" ]; then
         echo -e "  ${RED}✘${NC}  News Digest is not installed."
         echo -e "  ${DIM}Install it with:${NC}"
-        echo -e "  ${DIM}curl -fsSL https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.sh | bash${NC}"
+        echo -e "  ${DIM}curl -fsSLO https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.sh${NC}"
+        echo -e "  ${DIM}bash install.sh${NC}"
         exit 1
     fi
     if [ ! -f "$VENV_PYTHON" ]; then
@@ -66,7 +67,7 @@ cmd_run() {
         "")               flags="" ;;
         *)
             echo -e "  ${RED}✘${NC}  Unknown flag: $1"
-            echo -e "  ${DIM}Options: --dry, --force${NC}"
+            echo -e "  ${DIM}Options: --dry-run, --force${NC}"
             exit 1
             ;;
     esac
@@ -195,7 +196,7 @@ cmd_help() {
     echo -e "  ${BOLD}Usage:${NC}"
     echo -e "    news-digest                  ${DIM}Launch interactive menu${NC}"
     echo -e "    news-digest ${CYAN}run${NC}              Send today's digest"
-    echo -e "    news-digest ${CYAN}run --dry${NC}        Preview without sending"
+    echo -e "    news-digest ${CYAN}run --dry-run${NC}   Preview without sending"
     echo -e "    news-digest ${CYAN}run --force${NC}      Force re-send"
     echo -e "    news-digest ${CYAN}setup${NC}            Re-run the setup wizard"
     echo -e "    news-digest ${CYAN}uninstall${NC}        Remove everything"

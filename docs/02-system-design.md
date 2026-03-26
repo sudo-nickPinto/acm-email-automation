@@ -167,13 +167,17 @@ Both versions organize articles by source. The HTML version uses colored section
 
 | Concern | Mitigation |
 |---------|------------|
+| Installer trust boundary | Public installs come from GitHub Release assets instead of mutable branch URLs; the ZIP is checksum-verified before extraction, but the installer script and release URL are still a trust boundary |
 | Gmail password in code | Stored in `.env`, git-ignored via `.gitignore` |
 | App Password vs. real password | App Passwords are scoped and revocable |
 | TLS for SMTP | `starttls()` encrypts the connection before login |
-| RSS feed injection | HTML tags are stripped from descriptions via regex |
-| Secret in wizard input | Password echoed to terminal during input (limitation of basic `input()`) |
+| RSS feed injection | Feed-derived HTML is escaped before rendering, and non-HTTP(S) links are rejected in the HTML email |
+| Secret in wizard input | Password entry is hidden with `getpass`, reducing terminal exposure |
+| Local config exposure | `.env` is written with restrictive POSIX permissions (`0600`) |
 
 The `.env` file should **never** be committed to git. The `.env.example` file shows what variables are needed without revealing actual values.
+
+Checksum verification mainly catches corruption or mismatched artifacts. It does not independently authenticate the release origin because the installer, ZIP, and checksum are all served from the same release channel. Signed artifacts would be a stronger next step.
 
 ## Error Handling Philosophy
 

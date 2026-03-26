@@ -89,6 +89,7 @@ SELECTED_SOURCES=acm_technews,mit_tech_review,bbc_tech
 - No spaces around `=`
 - Lines starting with `#` are comments
 - This file is **never committed to git** (listed in `.gitignore`)
+- The setup flow tightens file permissions on POSIX systems so the file is only readable by the current user
 
 ## The `.env.example` File
 
@@ -118,6 +119,7 @@ Gmail requires a special "App Password" when 2-Factor Authentication is enabled.
 6. Copy the 16-character password
 
 The password looks like `abcd efgh ijkl mnop` (spaces are cosmetic — Gmail ignores them). The setup wizard strips spaces automatically.
+In the live setup flow, the password prompt is hidden so it does not echo back to the terminal.
 
 ## How Config Gets Used
 
@@ -141,6 +143,7 @@ If you ever want to change how configuration is loaded (say, from a different fi
 | Used regular Gmail password | Gmail rejects: "Application-specific password required" | Generate an App Password |
 | Committed `.env` to git | Secrets exposed in git history | Add to `.gitignore`, rotate credentials |
 | No sources selected | `SELECTED_SOURCES` is empty, script exits | Re-run `./start.sh` and pick sources |
+| `.env` readable by other local users | Secrets exposed on the same machine | Re-run the setup flow or `chmod 600 .env` on POSIX |
 
 ---
 

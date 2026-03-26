@@ -77,6 +77,9 @@ class TestEnvIO:
         content = env_file.read_text()
         assert "SMTP_EMAIL=a@gmail.com" in content
         assert "SCHEDULE_TIME=08:00" in content
+        if os.name != "nt":
+            mode = env_file.stat().st_mode & 0o777
+            assert mode == 0o600
 
     def test_write_and_read_roundtrip(self, tmp_path):
         env_file = tmp_path / ".env"
@@ -145,16 +148,18 @@ class TestChangePassword:
         "SCHEDULE_TIME": "",
     })
     @patch("newsdigest.cli._write_env")
-    @patch("builtins.input", side_effect=["abcdefghijklmnop", ""])
-    def test_updates_password(self, mock_input, mock_write, mock_read):
+    @patch("newsdigest.cli.getpass.getpass", return_value="abcdefghijklmnop")
+    @patch("builtins.input", side_effect=[""])
+    def test_updates_password(self, mock_input, mock_getpass, mock_write, mock_read):
         action_change_password()
         written = mock_write.call_args[0][0]
         assert written["SMTP_APP_PASSWORD"] == "abcdefghijklmnop"
 
     @patch("newsdigest.cli._read_env", return_value={"SMTP_APP_PASSWORD": "x"})
     @patch("newsdigest.cli._write_env")
-    @patch("builtins.input", side_effect=["cancel", ""])
-    def test_cancel_does_not_write(self, mock_input, mock_write, mock_read):
+    @patch("newsdigest.cli.getpass.getpass", return_value="cancel")
+    @patch("builtins.input", side_effect=[""])
+    def test_cancel_does_not_write(self, mock_input, mock_getpass, mock_write, mock_read):
         action_change_password()
         mock_write.assert_not_called()
 
@@ -166,8 +171,9 @@ class TestChangePassword:
         "SCHEDULE_TIME": "",
     })
     @patch("newsdigest.cli._write_env")
-    @patch("builtins.input", side_effect=["short", "has1number2here3", "abcdefghijklmnop", ""])
-    def test_rejects_invalid_passwords(self, mock_input, mock_write, mock_read):
+    @patch("newsdigest.cli.getpass.getpass", side_effect=["short", "has1number2here3", "abcdefghijklmnop"])
+    @patch("builtins.input", side_effect=[""])
+    def test_rejects_invalid_passwords(self, mock_input, mock_getpass, mock_write, mock_read):
         action_change_password()
         written = mock_write.call_args[0][0]
         assert written["SMTP_APP_PASSWORD"] == "abcdefghijklmnop"

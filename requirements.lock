@@ -1,0 +1,10 @@
+# Locked runtime dependencies for the packaged installer/bootstrap flow.
+# `start.sh` and `install.ps1` prefer this file so end-user installs stay
+# reproducible across releases. Keep `requirements.txt` as the human-edited
+# direct dependency list, then refresh these pins intentionally.
+certifi==2026.2.25
+charset-normalizer==3.4.6
+idna==3.11
+python-dotenv==1.2.2
+requests==2.33.0
+urllib3==2.6.3

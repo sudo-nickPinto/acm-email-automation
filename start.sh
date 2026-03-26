@@ -422,8 +422,12 @@ else
 fi
 
 info "Installing required packages (this takes a moment)..."
+REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.lock"
+if [ ! -f "$REQUIREMENTS_FILE" ]; then
+    REQUIREMENTS_FILE="$SCRIPT_DIR/requirements.txt"
+fi
 "$VENV_PIP" install -q --upgrade pip 2>/dev/null
-"$VENV_PIP" install -q -r "$SCRIPT_DIR/requirements.txt"
+"$VENV_PIP" install -q -r "$REQUIREMENTS_FILE"
 success "All packages installed."
 
 # ---------------------------------------------------------------------------

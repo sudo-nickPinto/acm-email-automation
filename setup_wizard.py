@@ -31,6 +31,7 @@
 Interactive terminal setup wizard for the News Digest tool.
 """
 
+import getpass
 import os
 import re
 import sys
@@ -99,6 +100,19 @@ def step(num: int, text: str) -> None:
 # ---------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).parent
 ENV_FILE = PROJECT_ROOT / ".env"
+
+
+def _protect_secret_file(path: Path) -> None:
+    """
+    Restrict local secret files to the current user on POSIX systems.
+    """
+    if os.name == "nt":
+        return
+
+    try:
+        path.chmod(0o600)
+    except OSError:
+        warn(f"Couldn't tighten permissions for {path.name}.")
 
 
 def _prompt_sources() -> list[NewsSource]:
@@ -244,10 +258,11 @@ def _prompt_app_password() -> str:
     print()
     print(f"    7. Copy that password and paste it below")
     print(f"       {DIM}(spaces don't matter — we'll handle them){NC}")
+    print(f"  {DIM}Your typing will be hidden for privacy.{NC}")
     print()
 
     while True:
-        password = input(f"  {BOLD}Your App Password:{NC} ").strip()
+        password = getpass.getpass(f"  Your App Password: ").strip()
 
         # Remove spaces (Google shows it as "abcd efgh ijkl mnop")
         password = password.replace(" ", "")
@@ -296,6 +311,7 @@ SCHEDULE_TIME={schedule_time}
 """
 
     ENV_FILE.write_text(env_content)
+    _protect_secret_file(ENV_FILE)
     success(f"Configuration saved to .env")
 
 

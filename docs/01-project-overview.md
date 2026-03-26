@@ -23,7 +23,7 @@ Without this tool:
 3. You miss articles because you skip a day
 
 With this tool:
-1. Run the one-line installer (or `./start.sh` if you cloned the repo) — the wizard handles everything
+1. Run the release installer (or `./start.sh` if you cloned the repo) — the bootstrap flow handles everything
 2. Your digest arrives automatically every day at the time you chose
 3. Or run `venv/bin/python3 main.py` whenever you want it on-demand
 4. One email, all your sources, neatly organized by newspaper
@@ -32,7 +32,9 @@ That's it.
 
 ## Who Is This For?
 
-This was built to share with friends — people who don't code. They paste one command into their terminal and the installer handles everything: downloading the project, installing Python if needed, walking through Gmail setup, and setting up automatic daily delivery. No git, no GitHub account, no coding knowledge required.
+This was built to share with friends — people who don't code. They paste one or two commands into their terminal and the installer handles the rest: downloading the project, verifying the packaged release, checking whether Python is installed, walking through Gmail setup, and setting up automatic daily delivery. No git, no GitHub account, no coding knowledge required.
+
+For maintainers, the release flow is separate: build a packaged ZIP, publish `SHA256SUMS.txt`, and upload the installer assets to a GitHub Release. The friend-facing install command points at `releases/latest/download`, so users never need to clone the repo.
 
 ## Project File Map
 
@@ -50,7 +52,8 @@ Here's every file and what it does:
 | `newsdigest/emailer.py` | Formats and sends the digest email | The layout editor + postal service |
 | `newsdigest/scheduler.py` | Installs daily schedule per OS | The alarm clock |
 | `newsdigest/config.py` | Loads settings from `.env` | The settings panel |
-| `requirements.txt` | Python dependencies | The shopping list |
+| `requirements.txt` | Human-edited direct dependencies | The shopping list |
+| `requirements.lock` | Pinned runtime dependency versions | The exact order |
 | `.env` | User's config (git-ignored) | The locked filing cabinet |
 | `.env.example` | Template for `.env` | The blank form |
 | `.last_sent` | Hash of the last-sent edition | The "already read" bookmark |
@@ -60,17 +63,19 @@ Here's every file and what it does:
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │  install.sh / install.ps1                                                │
-│  1. Downloads zip from GitHub (no git needed)                            │
-│  2. Extracts to ~/news-digest                                            │
-│  3. Launches start.sh                                                    │
+│  1. Downloads the packaged release from GitHub (no git needed)           │
+│  2. Verifies the package checksum                                        │
+│  3. Extracts to ~/news-digest                                            │
+│  4. Launches start.sh                                                    │
 └────────────────────────────────────────────────────────────────────┘
                         │
                         ▼
 ┌────────────────────────────────────────────────────────────────────┐
 │  start.sh                                                                │
-│  1. Installs Python (if needed)                                          │
+│  1. Checks for Python and shows install guidance if missing              │
 │  2. Creates virtual environment                                          │
-│  3. Launches setup_wizard.py                                             │
+│  3. Installs pinned runtime packages                                     │
+│  4. Launches setup_wizard.py                                             │
 └──────────────────────────┤─────────────────────────────────────────┘
                         │
                         ▼
@@ -113,8 +118,9 @@ Here's every file and what it does:
 ## Running It
 
 ```bash
-# One-line install (no git required)
-curl -fsSL https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.sh | bash
+# Recommended install (no git required)
+curl -fsSLO https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.sh
+bash install.sh
 
 # Or if you cloned the repo:
 chmod +x start.sh
@@ -132,6 +138,8 @@ venv/bin/python3 main.py --force
 # Change your sources or email settings
 ./start.sh
 ```
+
+Security note: the checksum helps verify the downloaded package, but the release source itself is still a trust boundary. If the GitHub release or account were compromised, users could still be served a bad installer. Signed releases are the next step up in assurance.
 
 ---
 

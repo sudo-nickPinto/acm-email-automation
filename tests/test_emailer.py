@@ -166,6 +166,25 @@ class TestBuildHtml:
         html = build_html([])
         assert "<!DOCTYPE html>" in html
 
+    def test_escapes_untrusted_feed_content(self):
+        source = NewsSource(
+            key="test", name='Bad <Source>', description="d",
+            rss_url="https://example.com/rss", max_articles=5,
+        )
+        article = Article(
+            title='<script>alert("x")</script>',
+            description='Hello <b>world</b>',
+            link='javascript:alert("x")',
+            source_name="Bad Source",
+        )
+        html = build_html([SourceResult(source=source, articles=[article])])
+
+        assert '<script>alert("x")</script>' not in html
+        assert "&lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt;" in html
+        assert "Hello &lt;b&gt;world&lt;/b&gt;" in html
+        assert 'href="javascript:alert(' not in html
+        assert "Link unavailable" in html
+
 
 # ---------------------------------------------------------------------------
 # send_email (mocked SMTP)

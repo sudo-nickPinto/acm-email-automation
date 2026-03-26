@@ -27,10 +27,12 @@
 Email sender module — formats and sends the multi-source news digest.
 """
 
+import html
 import smtplib
 from datetime import datetime
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from urllib.parse import urlsplit
 
 from newsdigest.config import RECIPIENT_EMAIL, SMTP_APP_PASSWORD, SMTP_EMAIL, SMTP_PORT, SMTP_SERVER
 from newsdigest.scraper import Article, SourceResult
@@ -54,6 +56,26 @@ def _edition_date() -> str:
     Return today's date in a human-friendly format like "March 25, 2026".
     """
     return datetime.now().strftime("%B %d, %Y")
+
+
+def _escape_html_text(value: str) -> str:
+    """Escape untrusted text before placing it into the HTML email."""
+    return html.escape(value, quote=True)
+
+
+def _safe_href(url: str) -> str:
+    """
+    Allow only ordinary web links in HTML output.
+    """
+    cleaned = url.strip()
+    if not cleaned:
+        return ""
+
+    parsed = urlsplit(cleaned)
+    if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
+        return ""
+
+    return html.escape(cleaned, quote=True)
 
 
 def build_plain_text(results: list[SourceResult]) -> str:
@@ -122,6 +144,8 @@ def build_html(results: list[SourceResult]) -> str:
     """
     greeting = _time_greeting()
     date = _edition_date()
+    greeting_html = _escape_html_text(greeting)
+    date_html = _escape_html_text(date)
 
     # Build HTML blocks for each source
     source_blocks = []
@@ -133,9 +157,11 @@ def build_html(results: list[SourceResult]) -> str:
         color = colors[i % len(colors)]
 
         if result.error:
+            source_name = _escape_html_text(result.source.name)
+            error_html = _escape_html_text(result.error)
             source_blocks.append(f"""
     <div style="margin-bottom:24px;padding:12px 16px;background:#fff3cd;border-left:4px solid #ffc107;border-radius:4px;">
-      <strong>⚠ {result.source.name}</strong> — {result.error}
+      <strong>⚠ {source_name}</strong> — {error_html}
     </div>""")
             continue
 
@@ -145,20 +171,27 @@ def build_html(results: list[SourceResult]) -> str:
         # Build article cards for this source
         article_cards = []
         for article in result.articles:
-            desc_html = article.description.replace("\n", "<br>") if article.description else ""
+            title_html = _escape_html_text(article.title)
+            desc_html = _escape_html_text(article.description).replace("\n", "<br>") if article.description else ""
             desc_block = f'<p style="margin:4px 0 8px 0;color:#555;font-size:14px;line-height:1.5;">{desc_html}</p>' if desc_html else ""
+            link_href = _safe_href(article.link)
+            if link_href:
+                link_block = f'<a href="{link_href}" style="color:{color};font-size:13px;font-weight:bold;text-decoration:none;">Read full article →</a>'
+            else:
+                link_block = '<span style="color:#777;font-size:13px;">Link unavailable</span>'
 
             article_cards.append(f"""
       <div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid #f0f0f0;">
-        <h3 style="margin:0 0 4px 0;font-size:15px;color:#1a1a2e;">{article.title}</h3>
+        <h3 style="margin:0 0 4px 0;font-size:15px;color:#1a1a2e;">{title_html}</h3>
         {desc_block}
-        <a href="{article.link}" style="color:{color};font-size:13px;font-weight:bold;text-decoration:none;">Read full article →</a>
+        {link_block}
       </div>""")
 
+        source_name = _escape_html_text(result.source.name)
         source_blocks.append(f"""
     <div style="margin-bottom:32px;">
       <div style="background:{color};color:white;padding:10px 16px;border-radius:6px 6px 0 0;">
-        <h2 style="margin:0;font-size:16px;font-weight:bold;">{result.source.name}</h2>
+        <h2 style="margin:0;font-size:16px;font-weight:bold;">{source_name}</h2>
       </div>
       <div style="border:1px solid #e0e0e0;border-top:none;border-radius:0 0 6px 6px;padding:16px;">
         {"".join(article_cards)}
@@ -172,8 +205,8 @@ def build_html(results: list[SourceResult]) -> str:
 
   <div style="background:white;border-radius:8px;padding:24px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
 
-    <p style="font-size:16px;margin-top:0;">{greeting},</p>
-    <p style="font-size:16px;">Your news digest for <strong>{date}</strong>:</p>
+    <p style="font-size:16px;margin-top:0;">{greeting_html},</p>
+    <p style="font-size:16px;">Your news digest for <strong>{date_html}</strong>:</p>
 
     <hr style="border:none;border-top:2px solid #eee;margin:20px 0;">
 

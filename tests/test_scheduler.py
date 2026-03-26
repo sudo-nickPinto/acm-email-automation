@@ -6,6 +6,7 @@ All subprocess and OS calls are mocked.
 
 from unittest.mock import patch, MagicMock, mock_open
 from pathlib import Path
+import shlex
 
 from newsdigest.scheduler import (
     detect_os,
@@ -15,6 +16,10 @@ from newsdigest.scheduler import (
     SCHEDULE_LABEL,
     CRON_TAG,
     _macos_plist_path,
+    PROJECT_ROOT,
+    VENV_PYTHON,
+    MAIN_PY,
+    LOGS_DIR,
 )
 
 
@@ -148,3 +153,28 @@ class TestConstants:
         path = _macos_plist_path()
         assert SCHEDULE_LABEL in str(path)
         assert str(path).endswith(".plist")
+
+
+class TestLinuxCronQuoting:
+
+    @patch("newsdigest.scheduler.subprocess.run")
+    def test_linux_install_quotes_paths(self, mock_run):
+        mock_run.side_effect = [
+            MagicMock(returncode=1, stdout=""),
+            MagicMock(returncode=0, stderr=""),
+        ]
+
+        from newsdigest.scheduler import _linux_install
+
+        _linux_install(8, 30)
+
+        install_call = mock_run.call_args_list[1]
+        cron_text = install_call.kwargs["input"]
+        expected = (
+            f"30 8 * * * cd {shlex.quote(str(PROJECT_ROOT))} && "
+            f"{shlex.quote(str(VENV_PYTHON))} {shlex.quote(str(MAIN_PY))} "
+            f">> {shlex.quote(str(LOGS_DIR / 'stdout.log'))} "
+            f"2>> {shlex.quote(str(LOGS_DIR / 'stderr.log'))} "
+            f"{CRON_TAG}\n"
+        )
+        assert cron_text == expected

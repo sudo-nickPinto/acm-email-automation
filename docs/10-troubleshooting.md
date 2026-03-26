@@ -125,7 +125,7 @@ venv/bin/python3 -m newsdigest.scraper
 
 **Fix:**
 ```bash
-venv/bin/pip install -r requirements.txt
+venv/bin/pip install -r requirements.lock
 ```
 
 Or, if the venv doesn't exist:

@@ -15,7 +15,7 @@ Read them in order — each document builds on the previous one.
 | 05 | [Scraper Deep Dive](05-scraper-deep-dive.md) | Multi-source RSS parsing, HTML cleaning, error handling per source |
 | 06 | [Emailer Deep Dive](06-emailer-deep-dive.md) | MIME multipart, multi-section HTML email, SMTP protocol |
 | 07 | [Main Orchestrator](07-main-orchestrator.md) | Entry point, CLI flags, duplicate detection, decision flow |
-| 08 | [Bootstrap, Setup, and Scheduling](08-automation-and-scheduling.md) | One-line installers, start.sh, setup wizard, scheduler.py, daily scheduling |
+| 08 | [Bootstrap, Setup, and Scheduling](08-automation-and-scheduling.md) | Release installers, checksum verification, start.sh, setup wizard, scheduler.py, daily scheduling |
 | 09 | [Best Practices](09-best-practices.md) | SRP, DRY, fail-fast, idempotency, graceful degradation, extensibility |
 | 10 | [Troubleshooting](10-troubleshooting.md) | Diagnosis flowchart, common errors, useful commands |
 

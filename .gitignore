@@ -7,3 +7,5 @@ venv/
 logs/
 *.plist
 .github
+dist/
+education/

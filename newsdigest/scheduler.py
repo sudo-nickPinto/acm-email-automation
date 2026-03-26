@@ -32,6 +32,7 @@ via macOS LaunchAgent, Linux cron, or Windows Task Scheduler.
 
 import os
 import platform
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -190,10 +191,16 @@ def _linux_install(hour: int, minute: int) -> None:
     """
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
+    quoted_project_root = shlex.quote(str(PROJECT_ROOT))
+    quoted_python = shlex.quote(str(VENV_PYTHON))
+    quoted_main = shlex.quote(str(MAIN_PY))
+    quoted_stdout = shlex.quote(str(LOGS_DIR / "stdout.log"))
+    quoted_stderr = shlex.quote(str(LOGS_DIR / "stderr.log"))
+
     cron_line = (
         f"{minute} {hour} * * * "
-        f"cd {PROJECT_ROOT} && {VENV_PYTHON} {MAIN_PY} "
-        f">> {LOGS_DIR / 'stdout.log'} 2>> {LOGS_DIR / 'stderr.log'} "
+        f"cd {quoted_project_root} && {quoted_python} {quoted_main} "
+        f">> {quoted_stdout} 2>> {quoted_stderr} "
         f"{CRON_TAG}"
     )
 

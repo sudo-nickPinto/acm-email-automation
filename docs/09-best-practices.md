@@ -85,6 +85,10 @@ The pattern:
 2. `.env` — git-ignored, contains **actual** secrets (written by the setup wizard)
 3. `config.py` — reads `.env` at import time, exposes constants
 
+In the live setup flow, `.env` is also written with restrictive POSIX permissions so the secrets are only readable by the current user.
+
+The installer follows the same philosophy: release assets are verified with `SHA256SUMS.txt` before extraction, which helps catch accidental corruption and mismatched artifacts. That does not independently authenticate the release origin, so the GitHub release channel is still a trust boundary today. Signed artifacts are still a good future hardening step.
+
 ---
 
 ## 6. Defensive Coding

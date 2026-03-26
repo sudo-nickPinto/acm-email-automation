@@ -18,23 +18,29 @@ A terminal tool that sends you a daily email digest of news articles from newspa
 
 **No coding knowledge required.** The setup wizard walks you through everything.
 
-## Install (One Command)
+## Install
 
-Open your terminal and paste the command for your OS:
+Open your terminal and paste the command for your OS.
+
+Recommended path: download the installer first, then run it locally.
 
 ### macOS / Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.sh | bash
+curl -fsSLO https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.sh
+bash install.sh
 ```
 
 ### Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.ps1 | iex
+iwr https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-That's it. The installer downloads everything, installs Python if needed, and launches the setup wizard.
+Fast-path alternative: if you accept the risk of executing the installer directly from the network stream, the release still supports `curl ... | bash` and `irm ... | iex`.
+
+That's it. The installer downloads a packaged release, verifies it with `SHA256SUMS.txt`, extracts it, and launches the bootstrap flow. The bootstrap then checks for Python, creates a virtual environment, installs the pinned runtime packages from `requirements.lock`, and launches the setup wizard.
 
 > **Already have git?** You can also clone directly:
 > ```bash
@@ -82,16 +88,43 @@ news-digest setup                    # Re-run the setup wizard
 news-digest uninstall                # Remove everything
 ```
 
+## Publish For Friends
+
+Build the release assets with:
+
+```bash
+python3 scripts/build_release.py
+```
+
+Run that from a clean, committed worktree. For an intentional local smoke build from uncommitted changes, use:
+
+```bash
+NEWSDIGEST_ALLOW_DIRTY=1 python3 scripts/build_release.py
+```
+
+That creates:
+- `dist/news-digest.zip`
+- `dist/SHA256SUMS.txt`
+- `dist/install.sh`
+- `dist/install.ps1`
+- `dist/SHARE_THIS.txt`
+
+Upload the first four files to a GitHub Release. `SHARE_THIS.txt` is a maintainer note you can keep locally.
+
+Security note: `SHA256SUMS.txt` helps detect corruption or mismatched artifacts, but it does not independently authenticate the release origin because the installer, ZIP, and checksum all come from the same GitHub release channel. The download URL itself is still a trust boundary today. Signed releases are the next stronger step.
+
 ## Project Structure
 
 ```
 acm_email_automation/
 ├── install.sh               # One-line installer (macOS / Linux)
 ├── install.ps1              # One-line installer (Windows)
+├── scripts/
+│   └── build_release.py     # Builds the release assets for sharing
 ├── start.sh                 # Bootstrap + setup wizard launcher
 ├── setup_wizard.py          # Interactive terminal setup
 ├── main.py                  # Entry point / orchestrator
-├── news-digest              # Global CLI command (symlinked to /usr/local/bin)
+├── news-digest              # Shell wrapper CLI (installed into a writable PATH dir)
 ├── newsdigest/              # Core Python package
 │   ├── __init__.py
 │   ├── config.py            # Loads settings from .env
@@ -100,7 +133,8 @@ acm_email_automation/
 │   ├── emailer.py           # Formats + sends the email
 │   ├── scheduler.py         # Installs daily schedule per OS
 │   └── cli.py               # Interactive menu system
-├── requirements.txt         # Python dependencies
+├── requirements.txt         # Human-edited direct dependency list
+├── requirements.lock        # Pinned runtime dependency versions used by installers
 ├── tests/                   # Test suite (pytest)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_sources.py      # Source registry tests
@@ -141,7 +175,7 @@ Or re-run the full setup wizard:
 
 ## Testing
 
-Run the test suite (122 tests, all offline — no network or email required):
+Run the test suite (131 tests, all offline — no network or email required):
 
 ```bash
 venv/bin/python3 -m pytest tests/ -v

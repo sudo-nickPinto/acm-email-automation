@@ -2,15 +2,18 @@
 # install.ps1 — One-Line Installer for News Digest (Windows)
 # =============================================================================
 #
-# This script is designed to be run from PowerShell:
-#   irm https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.ps1 | iex
+# This script can be downloaded from a GitHub Release asset and run locally:
+#   iwr https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.ps1 -OutFile install.ps1
+#   powershell -ExecutionPolicy Bypass -File .\install.ps1
+#
+# Convenience-only shortcut:
+#   irm https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.ps1 | iex
 #
 # What it does:
-#   1. Downloads the project as a zip from GitHub (no git required)
-#   2. Extracts it to ~/news-digest
-#   3. Launches the setup wizard (start.sh via Git Bash, or Python directly)
-#
-# No git, no GitHub account, no coding knowledge required.
+#   1. Downloads the packaged app zip from the latest GitHub Release
+#   2. Verifies the download against SHA256SUMS.txt
+#   3. Extracts it to ~/news-digest
+#   4. Launches the setup wizard
 # =============================================================================
 
 $ErrorActionPreference = "Stop"
@@ -18,10 +21,39 @@ $ErrorActionPreference = "Stop"
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-$RepoUrl    = "https://github.com/sudo-nickPinto/acm-email-automation/archive/refs/heads/public_attempt.zip"
-$InstallDir = Join-Path $HOME "news-digest"
-$ZipFile    = Join-Path $env:TEMP "news-digest-download.zip"
-$ExtractDir = Join-Path $env:TEMP "news-digest-extract"
+$ReleaseBaseUrl = if ($env:NEWSDIGEST_RELEASE_BASE_URL) {
+    $env:NEWSDIGEST_RELEASE_BASE_URL
+} else {
+    "https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download"
+}
+$PackageUrl = if ($env:NEWSDIGEST_PACKAGE_URL) {
+    $env:NEWSDIGEST_PACKAGE_URL
+} else {
+    "$ReleaseBaseUrl/news-digest.zip"
+}
+$ChecksumUrl = if ($env:NEWSDIGEST_CHECKSUM_URL) {
+    $env:NEWSDIGEST_CHECKSUM_URL
+} else {
+    "$ReleaseBaseUrl/SHA256SUMS.txt"
+}
+$InstallDir = if ($env:NEWSDIGEST_INSTALL_DIR) {
+    $env:NEWSDIGEST_INSTALL_DIR
+} else {
+    Join-Path $HOME "news-digest"
+}
+$SkipLaunch = $env:NEWSDIGEST_SKIP_LAUNCH -eq "1"
+$TempRoot = Join-Path $env:TEMP ("news-digest-install-" + [System.Guid]::NewGuid().ToString("N"))
+$ZipFile = Join-Path $TempRoot "news-digest-download.zip"
+$ChecksumFile = Join-Path $TempRoot "SHA256SUMS.txt"
+$ExtractDir = Join-Path $TempRoot "extracted"
+
+function Cleanup-Temp {
+    if (Test-Path $TempRoot) {
+        Remove-Item -Recurse -Force $TempRoot -ErrorAction SilentlyContinue
+    }
+}
+
+New-Item -ItemType Directory -Path $TempRoot -Force | Out-Null
 
 # ---------------------------------------------------------------------------
 # Banner
@@ -40,7 +72,7 @@ if (Test-Path $InstallDir) {
     Write-Host ""
     Write-Host "  To reconfigure, run:"
     Write-Host "    cd $InstallDir" -ForegroundColor DarkGray
-    Write-Host "    python start_wizard.py" -ForegroundColor DarkGray
+    Write-Host "    .\\venv\\Scripts\\python.exe .\\setup_wizard.py" -ForegroundColor DarkGray
     Write-Host ""
     $answer = Read-Host "  Reinstall from scratch? [y/n]"
     if ($answer -notmatch '^[Yy]') {
@@ -53,23 +85,48 @@ if (Test-Path $InstallDir) {
 }
 
 # ---------------------------------------------------------------------------
-# Step 2: Download
+# Step 2: Download + verify
 # ---------------------------------------------------------------------------
 Write-Host "  Downloading News Digest..." -ForegroundColor Cyan
 
-# Clean up previous temp files
-if (Test-Path $ZipFile)    { Remove-Item -Force $ZipFile }
-if (Test-Path $ExtractDir) { Remove-Item -Recurse -Force $ExtractDir }
-
 try {
-    Invoke-WebRequest -Uri $RepoUrl -OutFile $ZipFile -UseBasicParsing
+    Invoke-WebRequest -Uri $PackageUrl -OutFile $ZipFile -UseBasicParsing
 } catch {
-    Write-Host "  Download failed. Check your internet connection." -ForegroundColor Red
-    Write-Host "  Error: $_" -ForegroundColor DarkGray
+    Write-Host "  Download failed." -ForegroundColor Red
+    Write-Host "  If you're the maintainer, upload dist/news-digest.zip to the latest GitHub Release." -ForegroundColor DarkGray
+    Cleanup-Temp
     exit 1
 }
 
-Write-Host "  Downloaded." -ForegroundColor Green
+try {
+    Invoke-WebRequest -Uri $ChecksumUrl -OutFile $ChecksumFile -UseBasicParsing
+} catch {
+    Write-Host "  Could not download SHA256SUMS.txt." -ForegroundColor Red
+    Write-Host "  If you're the maintainer, upload dist/SHA256SUMS.txt to the latest GitHub Release." -ForegroundColor DarkGray
+    Cleanup-Temp
+    exit 1
+}
+
+$checksumMatch = Select-String -Path $ChecksumFile -Pattern '^(?<hash>[A-Fa-f0-9]{64})\s+\*?news-digest\.zip$' | Select-Object -First 1
+
+if (-not $checksumMatch) {
+    Write-Host "  SHA256SUMS.txt does not contain a valid checksum for news-digest.zip." -ForegroundColor Red
+    Cleanup-Temp
+    exit 1
+}
+
+$ExpectedHash = $checksumMatch.Matches[0].Groups["hash"].Value.ToLower()
+$ActualHash = (Get-FileHash -Path $ZipFile -Algorithm SHA256).Hash.ToLower()
+
+if ($ExpectedHash -ne $ActualHash) {
+    Write-Host "  Checksum verification failed." -ForegroundColor Red
+    Write-Host "  Expected: $ExpectedHash" -ForegroundColor DarkGray
+    Write-Host "  Actual:   $ActualHash" -ForegroundColor DarkGray
+    Cleanup-Temp
+    exit 1
+}
+
+Write-Host "  Downloaded and verified." -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
 # Step 3: Extract
@@ -80,23 +137,43 @@ try {
     Expand-Archive -Path $ZipFile -DestinationPath $ExtractDir -Force
 } catch {
     Write-Host "  Extraction failed." -ForegroundColor Red
+    Cleanup-Temp
     exit 1
 }
 
-# GitHub zips extract into a folder named repo-branch
-$ExtractedFolder = Get-ChildItem -Path $ExtractDir -Directory | Select-Object -First 1
+$TopLevelEntries = @(Get-ChildItem -Path $ExtractDir -Force)
+$TopLevelDirs = @(Get-ChildItem -Path $ExtractDir -Directory -Force)
 
-if (-not $ExtractedFolder) {
-    Write-Host "  Extraction failed — no folder found." -ForegroundColor Red
+if ($TopLevelEntries.Count -ne 1 -or $TopLevelDirs.Count -ne 1) {
+    Write-Host "  Extraction failed — expected a single top-level news-digest/ folder." -ForegroundColor Red
+    Cleanup-Temp
     exit 1
 }
 
-# Move to the install location
-Move-Item -Path $ExtractedFolder.FullName -Destination $InstallDir
+$ExtractedFolder = $TopLevelDirs[0]
 
-# Clean up temp files
-Remove-Item -Force $ZipFile -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force $ExtractDir -ErrorAction SilentlyContinue
+if ($ExtractedFolder.Name -ne "news-digest") {
+    Write-Host "  Extraction failed — package root must be news-digest/." -ForegroundColor Red
+    Cleanup-Temp
+    exit 1
+}
+
+foreach ($requiredPath in @("start.sh", "news-digest", "setup_wizard.py")) {
+    if (-not (Test-Path (Join-Path $ExtractedFolder.FullName $requiredPath))) {
+        Write-Host "  Extraction failed — package is missing $requiredPath." -ForegroundColor Red
+        Cleanup-Temp
+        exit 1
+    }
+}
+
+try {
+    Move-Item -Path $ExtractedFolder.FullName -Destination $InstallDir
+} catch {
+    Write-Host "  Could not move the extracted files into place." -ForegroundColor Red
+    Cleanup-Temp
+    exit 1
+}
+Cleanup-Temp
 
 Write-Host "  Installed to $InstallDir" -ForegroundColor Green
 
@@ -113,7 +190,7 @@ foreach ($cmd in @("python3", "python", "py")) {
         if ($version -match "Python (\d+)\.(\d+)") {
             $major = [int]$Matches[1]
             $minor = [int]$Matches[2]
-            if ($major -ge 3 -and $minor -ge 10) {
+            if ($major -gt 3 -or ($major -eq 3 -and $minor -ge 10)) {
                 $PythonCmd = $cmd
                 Write-Host "  Found $version ($cmd)" -ForegroundColor Green
                 break
@@ -153,16 +230,26 @@ Set-Location $InstallDir
 & $PythonCmd -m venv venv
 
 $VenvPython = Join-Path $InstallDir "venv\Scripts\python.exe"
-$VenvPip    = Join-Path $InstallDir "venv\Scripts\pip.exe"
+$VenvPip = Join-Path $InstallDir "venv\Scripts\pip.exe"
+$RequirementsFile = Join-Path $InstallDir "requirements.lock"
+if (-not (Test-Path $RequirementsFile)) {
+    $RequirementsFile = Join-Path $InstallDir "requirements.txt"
+}
 
 & $VenvPip install --quiet --upgrade pip 2>$null
-& $VenvPip install --quiet -r (Join-Path $InstallDir "requirements.txt")
+& $VenvPip install --quiet -r $RequirementsFile
 
 Write-Host "  All packages installed." -ForegroundColor Green
 
 # ---------------------------------------------------------------------------
 # Step 6: Launch the setup wizard
 # ---------------------------------------------------------------------------
+if ($SkipLaunch) {
+    Write-Host ""
+    Write-Host "  Skipping setup wizard launch (NEWSDIGEST_SKIP_LAUNCH=1)." -ForegroundColor DarkGray
+    exit 0
+}
+
 Write-Host ""
 Write-Host "  Launching setup wizard..." -ForegroundColor White
 Write-Host ""

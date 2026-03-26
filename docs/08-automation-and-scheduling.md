@@ -4,7 +4,7 @@
 
 Getting from "my friend opened a terminal" to "they're receiving daily news digests" requires a chain of scripts:
 
-1. **`install.sh`** / **`install.ps1`** — one-line installers that download the project (no git required)
+1. **`install.sh`** / **`install.ps1`** — release installers that download the packaged app (no git required)
 2. **`start.sh`** — a bash script that gets Python installed, creates a virtual environment, installs dependencies, and launches the wizard
 3. **`setup_wizard.py`** — a Python script that handles newspaper selection, Gmail setup, scheduling, and writes the `.env` file
 4. **`newsdigest/scheduler.py`** — installs a daily schedule using OS-native tools
@@ -15,23 +15,45 @@ These scripts exist so friends don't need git or a GitHub account. They paste on
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.sh | bash
+curl -fsSLO https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.sh
+bash install.sh
 ```
 
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/sudo-nickPinto/acm-email-automation/public_attempt/install.ps1 | iex
+iwr https://github.com/sudo-nickPinto/acm-email-automation/releases/latest/download/install.ps1 -OutFile install.ps1
+powershell -ExecutionPolicy Bypass -File .\install.ps1
 ```
+
+There are still `curl ... | bash` and `irm ... | iex` fast paths, but those execute the installer directly from the network stream. The two-step download-then-run flow is the safer default to recommend.
 
 ### What they do
 
-1. Download the project as a `.zip` from GitHub's archive URL (no git clone)
-2. Extract to `~/news-digest` (or `$HOME\news-digest` on Windows)
-3. If an existing installation is found, offer to reinstall
-4. Launch `start.sh` (or run the equivalent bootstrap steps directly on Windows)
+1. Download `news-digest.zip` and `SHA256SUMS.txt` from the latest GitHub Release
+2. Verify the package checksum before extracting anything
+3. Extract to `~/news-digest` (or `$HOME\news-digest` on Windows)
+4. Validate that the archive contains a single top-level `news-digest/` directory with the expected bootstrap files
+5. If an existing installation is found, offer to reinstall
+6. Launch `start.sh` (or run the equivalent bootstrap steps directly on Windows)
 
 `install.sh` uses `curl` + `unzip` with a Python `zipfile` fallback if `unzip` isn't available.
 `install.ps1` uses `Invoke-WebRequest` + `Expand-Archive` (built into PowerShell 5+).
+
+### Maintainer Release Flow
+
+Before you share the installer with friends, generate the release assets from the repo root:
+
+```bash
+python3 scripts/build_release.py
+```
+
+Run that from a clean worktree so you do not accidentally ship local-only edits. If you are doing an intentional local smoke build, set `NEWSDIGEST_ALLOW_DIRTY=1`.
+
+That produces `dist/news-digest.zip`, `dist/SHA256SUMS.txt`, `dist/install.sh`, `dist/install.ps1`, and `dist/SHARE_THIS.txt`. Upload the first four files to a GitHub Release; `SHARE_THIS.txt` is a local maintainer note. The packaged ZIP must contain exactly one top-level `news-digest/` directory because both installers validate that layout before moving files into place.
+
+### Security Note
+
+Checksum verification mainly catches corruption or mismatched artifacts. It does not remove the trust boundary around the release source itself because the installer, ZIP, and checksum are all served from the same release channel. If the GitHub account or release pipeline is compromised, the installer can still receive a bad package. Signed releases would be the next stronger hardening step.
 
 ## `start.sh` — The Bootstrap Script
 
@@ -101,10 +123,10 @@ On Windows, `start.sh` adjusts venv paths (`Scripts/` instead of `bin/`) and pip
 
 ```bash
 "$PYTHON_CMD" -m venv "$SCRIPT_DIR/venv"
-"$SCRIPT_DIR/venv/bin/pip" install -q -r "$SCRIPT_DIR/requirements.txt"
+"$SCRIPT_DIR/venv/bin/pip" install -q -r "$SCRIPT_DIR/requirements.lock"
 ```
 
-Creates an isolated Python environment with its own packages. This prevents conflicts with system-wide Python packages.
+Creates an isolated Python environment with its own packages. This prevents conflicts with system-wide Python packages. The bootstrap prefers `requirements.lock` so end-user installs get a pinned runtime dependency set for that release.
 
 ### Step 3: Launch the Setup Wizard
 
@@ -193,6 +215,7 @@ Input validation:
 - Strips spaces (Google shows passwords as `abcd efgh ijkl mnop`)
 - Checks for exactly 16 characters
 - Checks for letters only (no numbers or symbols)
+The live prompt hides the password while the user types it.
 
 ### Writing the `.env` File (`_write_env`)
 
@@ -230,14 +253,14 @@ Rather than using a Python-based scheduler (which would require a process runnin
 |----|-----------|----------|
 | **macOS** | LaunchAgent plist | `~/Library/LaunchAgents/com.newsdigest.daily.plist` |
 | **Linux** | crontab | User's crontab (tagged with `# com.newsdigest.daily`) |
-| **Windows** | Task Scheduler | `schtasks /TN "NewsDigest"` |
+| **Windows** | Task Scheduler | `schtasks /TN "com.newsdigest.daily"` |
 
 ### Public API
 
 ```python
-install_schedule(hour: int, minute: int) -> None  # Install/update daily schedule
-uninstall_schedule() -> None                       # Remove the daily schedule
-is_schedule_installed() -> bool                    # Check if a schedule exists
+install_schedule(hour: int, minute: int) -> str
+uninstall_schedule() -> str
+is_schedule_installed() -> bool
 ```
 
 ### How Each Backend Works
@@ -246,7 +269,7 @@ is_schedule_installed() -> bool                    # Check if a schedule exists
 
 **Linux (cron):** Adds a crontab entry like `30 8 * * * /path/to/venv/bin/python3 /path/to/main.py`. Uses a unique tag comment so the entry can be found and replaced on subsequent runs.
 
-**Windows (Task Scheduler):** Uses `schtasks.exe /Create /SC DAILY /ST 08:30 /TN "NewsDigest"` to create a scheduled task. The task runs even if the user isn't logged in (with `/RL HIGHEST` if available).
+**Windows (Task Scheduler):** Uses `schtasks.exe /Create /SC DAILY /ST 08:30 /TN "com.newsdigest.daily"` to create a scheduled task. The implementation returns a status string so the caller can show a friendly success or failure message in the wizard.
 
 ### The Wizard Integration
 
