@@ -7,9 +7,16 @@ from __future__ import annotations
 import hashlib
 import os
 import subprocess
+import sys
 import zipfile
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="install.sh requires bash, only runs on Unix",
+)
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INSTALL_SCRIPT = REPO_ROOT / "install.sh"

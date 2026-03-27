@@ -10,6 +10,7 @@ import os
 import shutil
 import socketserver
 import subprocess
+import sys
 import threading
 import zipfile
 from functools import partial
@@ -66,9 +67,10 @@ def _write_python_shims(base_dir: Path) -> Path:
         "fi\n"
         "exit 0\n"
     )
-    python_shim.chmod(0o755)
-    (shim_dir / "python").symlink_to(python_shim.name)
-    (shim_dir / "py").symlink_to(python_shim.name)
+    if sys.platform != "win32":
+        python_shim.chmod(0o755)
+        (shim_dir / "python").symlink_to(python_shim.name)
+        (shim_dir / "py").symlink_to(python_shim.name)
     return shim_dir
 
 

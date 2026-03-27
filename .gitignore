@@ -6,6 +6,7 @@ venv/
 .last_sent
 logs/
 *.plist
-.github
+.github/*
+!.github/workflows/
 dist/
 education/

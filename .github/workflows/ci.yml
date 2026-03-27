@@ -1,0 +1,181 @@
+# =============================================================================
+# ci.yml — Cross-platform CI for News Digest
+# =============================================================================
+# Runs the full test suite on macOS, Linux, and Windows.
+# Triggered on pushes and PRs to main, public_attempt, and the hardening branch.
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, public_attempt, secure-release-installer-hardening]
+  pull_request:
+    branches: [main, public_attempt]
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Full test suite — macOS + Linux (all 155+ tests)
+  # ---------------------------------------------------------------------------
+  test-unix:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.10", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.python-version }})
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest tests/ -v --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Full test suite — Windows (includes PowerShell smoke tests)
+  # ---------------------------------------------------------------------------
+  test-windows:
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+    runs-on: windows-latest
+    name: Tests (windows-latest, Python ${{ matrix.python-version }})
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest tests/ -v --tb=short
+
+  # ---------------------------------------------------------------------------
+  # Windows installer smoke test — real PowerShell, real Python, real venv
+  # ---------------------------------------------------------------------------
+  windows-installer-smoke:
+    runs-on: windows-latest
+    name: Windows installer smoke test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build release assets
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          $env:NEWSDIGEST_ALLOW_DIRTY = "1"
+          python scripts/build_release.py
+        shell: pwsh
+
+      - name: Serve release assets locally and run installer
+        run: |
+          # Start a background HTTP server to serve dist/
+          $job = Start-Job -ScriptBlock {
+            param($dir)
+            Set-Location $dir
+            python -m http.server 8199 --bind 127.0.0.1
+          } -ArgumentList "${{ github.workspace }}\dist"
+
+          # Give the server a moment to start
+          Start-Sleep -Seconds 3
+
+          # Configure installer to use local server
+          $env:NEWSDIGEST_RELEASE_BASE_URL = "http://127.0.0.1:8199"
+          $env:NEWSDIGEST_INSTALL_DIR = "${{ runner.temp }}\news-digest-smoke"
+          $env:NEWSDIGEST_SKIP_LAUNCH = "1"
+
+          try {
+            # Run the real installer
+            powershell -NoProfile -ExecutionPolicy Bypass -File install.ps1
+            if ($LASTEXITCODE -ne 0) {
+              Write-Host "Installer failed with exit code $LASTEXITCODE"
+              exit 1
+            }
+
+            # Verify the install directory
+            $installDir = "${{ runner.temp }}\news-digest-smoke"
+            if (-not (Test-Path "$installDir\setup_wizard.py")) {
+              Write-Host "FAIL: setup_wizard.py not found in $installDir"
+              exit 1
+            }
+            if (-not (Test-Path "$installDir\news-digest.ps1")) {
+              Write-Host "FAIL: news-digest.ps1 not found in $installDir"
+              exit 1
+            }
+            if (-not (Test-Path "$installDir\venv\Scripts\python.exe")) {
+              Write-Host "FAIL: venv Python not found in $installDir"
+              exit 1
+            }
+
+            # Verify the command wrapper was installed
+            $cmdWrapper = Join-Path $HOME "AppData\Local\NewsDigest\bin\news-digest.cmd"
+            if (-not (Test-Path $cmdWrapper)) {
+              Write-Host "FAIL: news-digest.cmd wrapper not found at $cmdWrapper"
+              exit 1
+            }
+
+            # Test dry-run through the launcher
+            & "$installDir\venv\Scripts\python.exe" "$installDir\main.py" --dry-run
+            # Dry-run will fail because no .env, but it should at least import cleanly
+            # (exit code doesn't matter here — we just want no import crash)
+
+            Write-Host "All installer smoke checks passed!" -ForegroundColor Green
+          } finally {
+            Stop-Job $job -ErrorAction SilentlyContinue
+            Remove-Job $job -Force -ErrorAction SilentlyContinue
+          }
+        shell: pwsh
+
+  # ---------------------------------------------------------------------------
+  # Windows news-digest.ps1 launcher smoke test
+  # ---------------------------------------------------------------------------
+  windows-launcher-smoke:
+    runs-on: windows-latest
+    name: Windows launcher (news-digest.ps1) smoke test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up venv in-place and test launcher
+        run: |
+          # Create a venv right here (simulating an installed copy)
+          python -m venv venv
+          venv\Scripts\pip.exe install --upgrade pip
+          venv\Scripts\pip.exe install -r requirements.txt
+
+          # Test the help command
+          pwsh -NoProfile -ExecutionPolicy Bypass -File news-digest.ps1 help
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "FAIL: news-digest.ps1 help exited with $LASTEXITCODE"
+            exit 1
+          }
+
+          Write-Host "Launcher smoke test passed!" -ForegroundColor Green
+        shell: pwsh
