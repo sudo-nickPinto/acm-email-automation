@@ -116,37 +116,38 @@ Security note: `SHA256SUMS.txt` helps detect corruption or mismatched artifacts,
 ## Project Structure
 
 ```
-acm_email_automation/
-├── install.sh               # One-line installer (macOS / Linux)
-├── install.ps1              # One-line installer (Windows)
+├── install.sh                   # One-line installer (macOS / Linux)
+├── install.ps1                  # One-line installer (Windows)
+├── start.sh                     # Bootstrap: installs Python, creates venv, launches wizard
+├── setup_wizard.py              # Interactive setup: sources, email, scheduling
+├── main.py                      # Orchestrator: fetch → deduplicate → send
+├── news-digest                  # CLI entry point (bash, symlinked to PATH)
+├── news-digest.ps1              # CLI entry point (PowerShell)
+│
+├── newsdigest/                  # Core package
+│   ├── config.py                #   Loads .env, exposes settings
+│   ├── sources.py               #   Newspaper RSS feed registry
+│   ├── scraper.py               #   Fetches and parses RSS feeds
+│   ├── emailer.py               #   Formats and sends the digest email
+│   ├── scheduler.py             #   Daily schedule per OS (LaunchAgent / cron / schtasks)
+│   ├── cli.py                   #   Interactive menu system
+│   └── paths.py                 #   Cross-platform path helpers
+│
 ├── scripts/
-│   └── build_release.py     # Builds the release assets for sharing
-├── start.sh                 # Bootstrap + setup wizard launcher
-├── setup_wizard.py          # Interactive terminal setup
-├── main.py                  # Entry point / orchestrator
-├── news-digest              # Shell wrapper CLI (installed into a writable PATH dir)
-├── newsdigest/              # Core Python package
-│   ├── __init__.py
-│   ├── config.py            # Loads settings from .env
-│   ├── sources.py           # Registry of newspaper RSS feeds
-│   ├── scraper.py           # Fetches + parses RSS feeds
-│   ├── emailer.py           # Formats + sends the email
-│   ├── scheduler.py         # Installs daily schedule per OS
-│   └── cli.py               # Interactive menu system
-├── requirements.txt         # Human-edited direct dependency list
-├── requirements.lock        # Pinned runtime dependency versions used by installers
-├── tests/                   # Test suite (pytest)
-│   ├── conftest.py          # Shared fixtures
-│   ├── test_sources.py      # Source registry tests
-│   ├── test_scraper.py      # RSS scraper tests
-│   ├── test_emailer.py      # Email formatter tests
-│   ├── test_scheduler.py    # Scheduler tests
-│   ├── test_config.py       # Config loading tests
-│   ├── test_main.py         # Orchestrator tests
-│   └── test_cli.py          # Interactive menu tests
-├── .env.example             # Template for configuration
-├── docs/                    # Full documentation
-└── .gitignore
+│   └── build_release.py         # Builds dist/ release assets
+│
+├── tests/                       # 155 pytest tests (fully offline)
+│   ├── conftest.py              #   Shared fixtures
+│   └── test_*.py                #   One test file per module
+│
+├── education/                   # Deep-dive course (19 lessons + appendices + labs)
+│   ├── 00–18 lessons            #   Architecture, security, testing, extending
+│   ├── appendices/              #   Command ref, file ref, glossary, security checklist
+│   ├── diagrams/                #   Install, runtime, and scheduling flow diagrams
+│   └── labs/                    #   Hands-on exercises (dry run, tracing, adding sources)
+│
+├── requirements.txt             # Direct dependencies
+└── requirements.lock            # Pinned versions used by installers
 ```
 
 ## Changing Your Settings
