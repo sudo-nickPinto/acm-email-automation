@@ -88,31 +88,6 @@ news-digest setup                    # Re-run the setup wizard
 news-digest uninstall                # Remove everything
 ```
 
-## Publish For Friends
-
-Build the release assets with:
-
-```bash
-python3 scripts/build_release.py
-```
-
-Run that from a clean, committed worktree. For an intentional local smoke build from uncommitted changes, use:
-
-```bash
-NEWSDIGEST_ALLOW_DIRTY=1 python3 scripts/build_release.py
-```
-
-That creates:
-- `dist/news-digest.zip`
-- `dist/SHA256SUMS.txt`
-- `dist/install.sh`
-- `dist/install.ps1`
-- `dist/SHARE_THIS.txt`
-
-Upload the first four files to a GitHub Release. `SHARE_THIS.txt` is a maintainer note you can keep locally.
-
-Security note: `SHA256SUMS.txt` helps detect corruption or mismatched artifacts, but it does not independently authenticate the release origin because the installer, ZIP, and checksum all come from the same GitHub release channel. The download URL itself is still a trust boundary today. Signed releases are the next stronger step.
-
 ## Project Structure
 
 ```
