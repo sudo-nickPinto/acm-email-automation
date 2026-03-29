@@ -3,10 +3,10 @@ __pycache__/
 *.pyc
 venv/
 .venv/
+.tmp-test-venv/
 .last_sent
 logs/
 *.plist
 .github/*
 !.github/workflows/
 dist/
-education/
