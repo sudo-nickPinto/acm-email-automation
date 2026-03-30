@@ -48,6 +48,20 @@ That's it. The installer downloads a packaged release, verifies it with `SHA256S
 > cd acm-email-automation && chmod +x start.sh && ./start.sh
 > ```
 
+## After Install
+
+Once setup finishes, the `news-digest` command is available from any terminal window:
+
+```bash
+news-digest                          # Open the interactive menu
+news-digest run                      # Send your digest now
+news-digest run --dry-run            # Preview without sending
+news-digest run --force              # Resend even if already sent today
+news-digest setup                    # Re-run the setup wizard
+news-digest status                   # Show current configuration
+news-digest uninstall                # Remove everything
+```
+
 ## How It Works
 
 ```
@@ -64,29 +78,12 @@ The setup wizard:
 3. Optionally sets up **automatic daily delivery** (LaunchAgent on macOS, cron on Linux, Task Scheduler on Windows)
 4. Offers to send a test email
 
-After setup, your digest arrives automatically — or manage everything through the interactive menu:
-
-```bash
-news-digest                         # Launch interactive menu
-```
-
-The menu lets you:
+After setup, your digest arrives automatically — or type `news-digest` to open the interactive menu. The menu lets you:
 - Send your digest now, preview it, or force-resend
 - Change your newspaper sources, email, or app password
 - Adjust or disable automatic scheduling
 - View current status
 - Uninstall everything
-
-You can also run commands directly:
-
-```bash
-news-digest run                     # Send the digest
-news-digest run --dry-run            # Preview without sending
-news-digest run --force              # Resend even if already sent today
-news-digest status                   # Show current configuration
-news-digest setup                    # Re-run the setup wizard
-news-digest uninstall                # Remove everything
-```
 
 ## Project Structure
 
@@ -136,18 +133,19 @@ news-digest
 Or re-run the full setup wizard:
 
 ```bash
-./start.sh
+news-digest setup
 ```
 
 ## Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| `SMTPAuthenticationError` | Regenerate your Gmail App Password and re-run `./start.sh` |
-| "No news sources configured" | Run `./start.sh` to select your sources |
+| `SMTPAuthenticationError` | Regenerate your Gmail App Password and run `news-digest setup` |
+| "No news sources configured" | Run `news-digest setup` to select your sources |
 | "No articles found" | RSS feeds may be temporarily unavailable |
-| "Already sent this digest" | Use `--force` to resend, or wait for new articles |
+| "Already sent this digest" | Use `news-digest run --force` to resend, or wait for new articles |
 | Python not found after install | Close and reopen your terminal, then run `./start.sh` again |
+| `command not found: news-digest` | Close and reopen your terminal (PATH update takes effect on new sessions) |
 
 ## Testing
 

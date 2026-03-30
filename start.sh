@@ -446,13 +446,26 @@ if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
 elif [ -d "$HOME/.local/bin" ] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
     ln -sf "$LINK_TARGET" "$HOME/.local/bin/news-digest"
     LINK_INSTALLED="$HOME/.local/bin"
+    # If ~/.local/bin isn't in PATH, add it to the user's shell profile
     case ":$PATH:" in
         *":$HOME/.local/bin:"*) ;;
         *)
-            echo ""
-            echo -e "  ${YELLOW}⚠${NC}  ~/.local/bin is not in your PATH."
-            echo -e "  ${DIM}Add this to your ~/.bashrc or ~/.zshrc:${NC}"
-            echo -e "  ${DIM}  export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
+            SHELL_PROFILE=""
+            if [ -n "$ZSH_VERSION" ] || [ "$(basename "$SHELL" 2>/dev/null)" = "zsh" ]; then
+                SHELL_PROFILE="$HOME/.zshrc"
+            elif [ -f "$HOME/.bashrc" ]; then
+                SHELL_PROFILE="$HOME/.bashrc"
+            elif [ -f "$HOME/.bash_profile" ]; then
+                SHELL_PROFILE="$HOME/.bash_profile"
+            fi
+            if [ -n "$SHELL_PROFILE" ]; then
+                if ! grep -q '.local/bin' "$SHELL_PROFILE" 2>/dev/null; then
+                    echo '' >> "$SHELL_PROFILE"
+                    echo '# Added by News Digest installer' >> "$SHELL_PROFILE"
+                    echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$SHELL_PROFILE"
+                fi
+            fi
+            export PATH="$HOME/.local/bin:$PATH"
             ;;
     esac
 fi

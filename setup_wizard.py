@@ -110,20 +110,12 @@ def _venv_python() -> Path:
 
 def _setup_command() -> str:
     """Return the user-facing command to re-run setup."""
-    if is_windows():
-        return "news-digest setup"
-    return "./start.sh"
+    return "news-digest setup"
 
 
 def _run_command(*args: str) -> str:
     """Return a user-facing command to run the digest."""
-    if is_windows():
-        command = "news-digest run"
-        if args:
-            command = f"{command} {' '.join(args)}"
-        return command
-
-    command = "venv/bin/python3 main.py"
+    command = "news-digest run"
     if args:
         command = f"{command} {' '.join(args)}"
     return command
@@ -540,19 +532,17 @@ def run_wizard() -> None:
 
     print(f"  {GREEN}Your news digest is ready to go.{NC}")
     print()
-    print(f"  {BOLD}Quick reference:{NC}")
+    print(f"  {BOLD}{CYAN}>>>  Type  news-digest  anywhere in your terminal to get started.{NC}")
     print()
     if schedule_time:
         print(f"    {GREEN}Auto-delivery is ON — daily at {schedule_time}{NC}")
         print()
-    print(f"    Send your digest now:")
-    print(f"    {DIM}$ {_run_command()}{NC}")
+    print(f"  {BOLD}Quick reference:{NC}")
     print()
-    print(f"    Preview without sending:")
-    print(f"    {DIM}$ {_run_command('--dry-run')}{NC}")
-    print()
-    print(f"    Change your settings:")
-    print(f"    {DIM}$ {_setup_command()}{NC}")
+    print(f"    {DIM}$ news-digest{NC}              Open the interactive menu")
+    print(f"    {DIM}$ {_run_command()}{NC}          Send your digest now")
+    print(f"    {DIM}$ {_run_command('--dry-run')}{NC}  Preview without sending")
+    print(f"    {DIM}$ {_setup_command()}{NC}        Change your settings")
     print()
 
 
