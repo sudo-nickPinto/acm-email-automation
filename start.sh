@@ -431,12 +431,38 @@ fi
 success "All packages installed."
 
 # ---------------------------------------------------------------------------
-# Step 3: Create logs directory
+# Step 3: Create logs directory and install CLI command
 # ---------------------------------------------------------------------------
 mkdir -p "$SCRIPT_DIR/logs"
 
+chmod +x "$SCRIPT_DIR/news-digest" 2>/dev/null || true
+
+# Install the news-digest command so it's available from anywhere
+LINK_TARGET="$SCRIPT_DIR/news-digest"
+LINK_INSTALLED=""
+if [ -d "/usr/local/bin" ] && [ -w "/usr/local/bin" ]; then
+    ln -sf "$LINK_TARGET" /usr/local/bin/news-digest
+    LINK_INSTALLED="/usr/local/bin"
+elif [ -d "$HOME/.local/bin" ] || mkdir -p "$HOME/.local/bin" 2>/dev/null; then
+    ln -sf "$LINK_TARGET" "$HOME/.local/bin/news-digest"
+    LINK_INSTALLED="$HOME/.local/bin"
+    case ":$PATH:" in
+        *":$HOME/.local/bin:"*) ;;
+        *)
+            echo ""
+            echo -e "  ${YELLOW}⚠${NC}  ~/.local/bin is not in your PATH."
+            echo -e "  ${DIM}Add this to your ~/.bashrc or ~/.zshrc:${NC}"
+            echo -e "  ${DIM}  export PATH=\"\$HOME/.local/bin:\$PATH\"${NC}"
+            ;;
+    esac
+fi
+
+if [ -n "$LINK_INSTALLED" ]; then
+    success "Installed 'news-digest' command (available from any terminal)"
+fi
+
 # ---------------------------------------------------------------------------
-# Step 3: Launch the interactive setup wizard
+# Step 4: Launch the interactive setup wizard
 # ---------------------------------------------------------------------------
 # The wizard is a Python script that handles:
 #   - Newspaper source selection

@@ -22,7 +22,14 @@ set -e
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-INSTALL_DIR="$HOME/news-digest"
+# Resolve the real directory this script lives in (works through symlinks)
+SOURCE="${BASH_SOURCE[0]}"
+while [ -L "$SOURCE" ]; do
+    DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+    SOURCE="$(readlink "$SOURCE")"
+    [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+INSTALL_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 VENV_PYTHON="$INSTALL_DIR/venv/bin/python3"
 
 # ---------------------------------------------------------------------------
