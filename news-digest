@@ -31,6 +31,7 @@ while [ -L "$SOURCE" ]; do
 done
 INSTALL_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 VENV_PYTHON="$INSTALL_DIR/venv/bin/python3"
+export PYTHONPATH="$INSTALL_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
 # ---------------------------------------------------------------------------
 # Colors
